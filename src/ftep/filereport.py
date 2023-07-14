@@ -1,10 +1,9 @@
 import json
 import logging
 import re
-import requests
 import sys
 
-from ftep import accessions
+from ftep import accessions, utils
 
 
 # Example URLs. Prefix them all with https://www.ebi.ac.uk/ena/portal/api/
@@ -50,34 +49,13 @@ def filereport(accession, accession_type, fields=None):
         "format": "json"
     }
     if fields is None:
+        fields = url_data["fields"]
         data["fields"] = ",".join(url_data["fields"])
     else:
         data["fields"] = ",".join(fields)
 
-    logging.debug(f"query url '{url}' with {data}")
-
-    try:
-        r = requests.get(url, data)
-    except:
-        logging.debug(r.url)
-        raise Exception("Error querying ENA accession={accession} {r.url}")
-
-    logging.debug(f"request url: {r.url}; status ok: {r.status_code == requests.codes.ok}" )
-
-    if r.status_code != requests.codes.ok:
-        raise Exception(f"Error requesting data. Error code={r.status_code}. {r.url}")
-
-    try:
-        results = json.loads(r.text)
-    except:
-        raise Exception(f"Error parsing json from query:\n{r.text}")
-    logging.debug(json.dumps(results, indent=2))
-
-    for d in results:
-        for k, v  in d.items():
-            if v == "":
-                d[k] = None
-    return results
+    results = utils.request(url, data)
+    return fields, results
 
 
 def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
@@ -103,7 +81,7 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
         assert result_type is not None
 
         try:
-            new_results = filereport(fixed_accession, result_type, fields=fields)
+            new_fields, new_results = filereport(fixed_accession, result_type, fields=fields)
         except:
             logging.warning(f"Error getting data for accession {accession}. Skipping")
             continue
@@ -115,8 +93,10 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
         logging.debug(f"results for {accession}: {new_results}")
         if outformat == "tsv":
             if columns is None:
-                columns = list(new_results[0].keys())
+                columns = new_fields
                 print("input_accession", *columns, sep="\t")
+            else:
+                assert set(columns) == set(new_fields)
 
             for result in new_results:
                 print(accession, *[replace_none.get(result[x], result[x]) for x in columns], sep="\t")
@@ -125,3 +105,10 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
 
     if outformat == "json":
         print(json.dumps(results, indent=2))
+
+
+
+def get_allowed_fields(data_type):
+    url = "https://www.ebi.ac.uk/ena/portal/api/searchFields?"
+    results = utils.request(url, {"result": data_type}, to_json=False)
+    print(results)

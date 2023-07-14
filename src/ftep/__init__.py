@@ -10,6 +10,7 @@ __all__ = [
     "accessions",
     "filereport",
     "tasks",
+    "utils",
 ]
 
 from ftep import *

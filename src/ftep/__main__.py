@@ -43,12 +43,33 @@ def main(args=None):
         metavar="FILENAME",
     )
     subparser_filereport.add_argument(
+        "-c", "--columns", "--fields",
+        help="Columns/fields to output. Comma-separated list. Not sanity checked, so up to you to get it right",
+        metavar="col1,col2,...",
+    )
+    subparser_filereport.add_argument(
         "--outfmt",
         choices=["json", "tsv"],
         help="Output format json or tsv [%(default)s]",
         default="tsv",
     )
     subparser_filereport.set_defaults(func=ftep.tasks.filereport.run)
+
+
+    # --------------------------- get_fields ----------------------------------
+    subparser_get_fields = subparsers.add_parser(
+        "get_fields",
+        parents=[common_parser],
+        help="Get availble fields for a given data type (eg read_run)",
+        usage="ftep filereport [options] data_type",
+        description="Get availble fields for a given data type (eg read_run)",
+    )
+    subparser_get_fields.add_argument(
+        "data_type",
+        help="Type of data (eg read_run)",
+    )
+    subparser_get_fields.set_defaults(func=ftep.tasks.get_fields.run)
+
 
 
     args = parser.parse_args()
