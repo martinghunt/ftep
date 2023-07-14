@@ -1,2 +1,2 @@
 # ftep
-EAN metadata queries
+ENA metadata queries
