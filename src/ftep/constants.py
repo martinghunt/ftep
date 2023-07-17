@@ -42,6 +42,7 @@ RUN_BIG = RUN_DEFAULT + [
     "read_count",
     "base_count",
     "collection_date",
+    "scientific_name",
 ]
 
 FIELD_PRESETS = {
