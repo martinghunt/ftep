@@ -28,9 +28,9 @@ def main(args=None):
     subparser_search = subparsers.add_parser(
         "search",
         parents=[common_parser],
-        help="General search search from an accession or file of accessions",
+        help="General search from an accession or file of accessions",
         usage="ftep search [options]",
-        description="General search search from an accession or file of accessions",
+        description="General search from an accession or file of accessions",
     )
     search_acc_group = subparser_search.add_mutually_exclusive_group(required=True)
     search_acc_group.add_argument(
