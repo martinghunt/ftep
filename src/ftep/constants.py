@@ -13,12 +13,14 @@ URL_SEARCH_DATA = {
     "assembly": {
         "main_type": "search",
         "result": "assembly",
-        # "fields": ["accession", "sample_accession", "run_accession", "scientific_name"],
     },
     "sample": {
         "main_type": "search",
         "result": "read_run",
-        # "fields": ["study_accession", "secondary_study_accession", "sample_accession", "secondary_sample_accession", "run_accession"],
+    },
+    "run": {
+        "main_type": "search",
+        "result": "read_run",
     },
 }
 
@@ -26,15 +28,15 @@ URL_SEARCH_DATA = {
 ASSEMBLY_SMALL = ["accession", "sample_accession", "run_accession"]
 ASSEMBLY_DEFAULT = ASSEMBLY_SMALL + ["scientific_name", "tax_id"]
 
-SAMPLE_SMALL = [
+RUN_SMALL = [
     "study_accession",
     "secondary_study_accession",
     "sample_accession",
     "secondary_sample_accession",
     "run_accession",
 ]
-SAMPLE_DEFAULT = SAMPLE_SMALL + ["instrument_platform", "library_layout", "fastq_ftp"]
-SAMPLE_BIG = SAMPLE_DEFAULT + [
+RUN_DEFAULT = RUN_SMALL + ["instrument_platform", "library_layout", "fastq_ftp"]
+RUN_BIG = RUN_DEFAULT + [
     "center_name",
     "broker_name",
     "read_count",
@@ -49,8 +51,13 @@ FIELD_PRESETS = {
         "BIG": ASSEMBLY_DEFAULT,
     },
     "sample": {
-        "SMALL": SAMPLE_SMALL,
-        "DEFAULT": SAMPLE_DEFAULT,
-        "BIG": SAMPLE_BIG,
+        "SMALL": RUN_SMALL,
+        "DEFAULT": RUN_DEFAULT,
+        "BIG": RUN_BIG,
+    },
+    "run": {
+        "SMALL": RUN_SMALL,
+        "DEFAULT": RUN_DEFAULT,
+        "BIG": RUN_BIG,
     },
 }

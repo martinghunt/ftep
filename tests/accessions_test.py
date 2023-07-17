@@ -13,3 +13,6 @@ def test_identify_accession():
     assert f("SAMN123456") == ("SAMN123456", "sample")
     assert f("ERS123456") == ("ERS123456", "sample")
     assert f("ERS12345") == (None, None) # too short
+
+    assert f("ERR123456") == ("ERR123456", "run")
+    assert f("ERR12345") == (None, None) # too short

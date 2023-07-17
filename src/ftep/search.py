@@ -14,6 +14,8 @@ def search_key_value(query_type, accession):
         )
     elif query_type == "sample":
         return "query", f"sample_accession={accession}"
+    elif query_type == "run":
+        return "query", f"accession={accession}"
     else:
         raise NotImplementedError(f"query_type")
 
