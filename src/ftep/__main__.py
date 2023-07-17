@@ -24,44 +24,48 @@ def main(args=None):
         help="More verbose logging, and less file cleaning",
     )
 
-    # ---------------------------- filereport ---------------------------------
-    subparser_filereport = subparsers.add_parser(
-        "filereport",
+    # ------------------------------ search -----------------------------------
+    subparser_search = subparsers.add_parser(
+        "search",
         parents=[common_parser],
-        help="General filereport search. Try to guess from format of accession",
-        usage="ftep filereport [options]",
-        description="General filereport search. Try to guess from format of accession",
+        help="General search search from an accession or file of accessions",
+        usage="ftep search [options]",
+        description="General search search from an accession or file of accessions",
     )
-    filereport_acc_group = subparser_filereport.add_mutually_exclusive_group(required=True)
-    filereport_acc_group.add_argument(
-        "-a", "--accession",
+    search_acc_group = subparser_search.add_mutually_exclusive_group(required=True)
+    search_acc_group.add_argument(
+        "-a",
+        "--accession",
         help="Accession to search for",
     )
-    filereport_acc_group.add_argument(
-        "-f", "--acc_file",
+    search_acc_group.add_argument(
+        "-f",
+        "--acc_file",
         help="File of accessions to search for, one per line",
         metavar="FILENAME",
     )
-    subparser_filereport.add_argument(
-        "-c", "--columns", "--fields",
-        help="Columns/fields to output. Comma-separated list. Not sanity checked, so up to you to get it right",
+    subparser_search.add_argument(
+        "-c",
+        "--columns",
+        "--fields",
+        help="Columns/fields to output. Comma-separated list. Not sanity checked, so up to you to get it right. or use one of the presets (SMALL,DEFAULT,BIG)",
         metavar="col1,col2,...",
+        default="DEFAULT",
     )
-    subparser_filereport.add_argument(
+    subparser_search.add_argument(
         "--outfmt",
         choices=["json", "tsv"],
         help="Output format json or tsv [%(default)s]",
         default="tsv",
     )
-    subparser_filereport.set_defaults(func=ftep.tasks.filereport.run)
-
+    subparser_search.set_defaults(func=ftep.tasks.search.run)
 
     # --------------------------- get_fields ----------------------------------
     subparser_get_fields = subparsers.add_parser(
         "get_fields",
         parents=[common_parser],
         help="Get availble fields for a given data type (eg read_run)",
-        usage="ftep filereport [options] data_type",
+        usage="ftep get_fields [options] data_type",
         description="Get availble fields for a given data type (eg read_run)",
     )
     subparser_get_fields.add_argument(
@@ -69,8 +73,6 @@ def main(args=None):
         help="Type of data (eg read_run)",
     )
     subparser_get_fields.set_defaults(func=ftep.tasks.get_fields.run)
-
-
 
     args = parser.parse_args()
     if not hasattr(args, "func"):

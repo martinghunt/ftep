@@ -1,5 +1,5 @@
 __all__ = [
-    "filereport",
+    "search",
     "get_fields",
 ]
 
