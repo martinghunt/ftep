@@ -25,7 +25,7 @@ URL_SEARCH_DATA = {
 }
 
 
-ASSEMBLY_SMALL = ["accession", "sample_accession", "run_accession"]
+ASSEMBLY_SMALL = ["accession", "sample_accession", "run_accession", "version"]
 ASSEMBLY_DEFAULT = ASSEMBLY_SMALL + ["scientific_name", "tax_id"]
 
 RUN_SMALL = [
