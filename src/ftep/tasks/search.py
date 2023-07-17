@@ -8,4 +8,5 @@ def run(options):
         acc_file=options.acc_file,
         outformat=options.outfmt,
         fields=fields,
+        sample2run=options.s2r,
     )

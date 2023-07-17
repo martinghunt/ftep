@@ -16,7 +16,7 @@ URL_SEARCH_DATA = {
     },
     "sample": {
         "main_type": "search",
-        "result": "read_run",
+        "result": "sample",
     },
     "run": {
         "main_type": "search",
@@ -27,6 +27,21 @@ URL_SEARCH_DATA = {
 
 ASSEMBLY_SMALL = ["accession", "sample_accession", "run_accession", "version"]
 ASSEMBLY_DEFAULT = ASSEMBLY_SMALL + ["scientific_name", "tax_id"]
+
+SAMPLE_SMALL = [
+    "study_accession",
+    "sample_accession",
+]
+SAMPLE_DEFAULT = [
+    "secondary_sample_accession",
+    "collection_date",
+    "country",
+]
+
+SAMPLE_BIG = SAMPLE_DEFAULT + [
+    "center_name",
+    "broker_name",
+]
 
 RUN_SMALL = [
     "study_accession",
@@ -45,6 +60,7 @@ RUN_BIG = RUN_DEFAULT + [
     "scientific_name",
 ]
 
+
 FIELD_PRESETS = {
     "assembly": {
         "SMALL": ASSEMBLY_SMALL,
@@ -52,9 +68,9 @@ FIELD_PRESETS = {
         "BIG": ASSEMBLY_DEFAULT,
     },
     "sample": {
-        "SMALL": RUN_SMALL,
-        "DEFAULT": RUN_DEFAULT,
-        "BIG": RUN_BIG,
+        "SMALL": SAMPLE_SMALL,
+        "DEFAULT": SAMPLE_DEFAULT,
+        "BIG": SAMPLE_BIG,
     },
     "run": {
         "SMALL": RUN_SMALL,

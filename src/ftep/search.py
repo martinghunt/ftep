@@ -15,15 +15,18 @@ def search_key_value(query_type, accession):
     elif query_type == "sample":
         return "query", f"sample_accession={accession}"
     elif query_type == "run":
-        return "query", f"accession={accession}"
+        return "query", f"run_accession={accession}"
     else:
         raise NotImplementedError(f"query_type")
 
 
-def ena_query(accession, accession_type, fields=None):
+def ena_query(accession, accession_type, fields=None, sample2run=False):
+    search_key, search_val = search_key_value(accession_type, accession)
+    if sample2run and accession_type == "sample":
+        logging.debug("Getting run data instead of sample data")
+        accession_type = "run"
     url_data = constants.URL_SEARCH_DATA[accession_type]
     url = f"{constants.BASE_PORTAL_URL}{url_data['main_type']}?"
-    search_key, search_val = search_key_value(accession_type, accession)
 
     data = {"result": url_data["result"], search_key: search_val, "format": "json"}
 
@@ -40,7 +43,7 @@ def ena_query(accession, accession_type, fields=None):
     return fields, results
 
 
-def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
+def search(accession=None, acc_file=None, fields=None, outformat="tsv", sample2run=False):
     to_search = []
     if accession is not None:
         to_search.append(accession)
@@ -67,7 +70,7 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
 
         try:
             new_fields, new_results = ena_query(
-                fixed_accession, result_type, fields=fields
+                fixed_accession, result_type, fields=fields, sample2run=sample2run,
             )
         except:
             logging.warning(f"Error getting data for accession {accession}. Skipping")

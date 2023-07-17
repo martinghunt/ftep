@@ -53,6 +53,11 @@ def main(args=None):
         default="DEFAULT",
     )
     subparser_search.add_argument(
+        "--s2r",
+        action="store_true",
+        help="'sample to run': run data is reported for sample accessions",
+    )
+    subparser_search.add_argument(
         "--outfmt",
         choices=["json", "tsv"],
         help="Output format json or tsv [%(default)s]",
