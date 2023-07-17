@@ -29,6 +29,7 @@ ftep search -f acc.txt
 Get metadata for sample `SAMN05276490` in JSON format:
 ```
 ftep search -a SAMN05276490 --outfmt json
+```
 
 Get all available metadata for sample `SAMN05276490`:
 ```
