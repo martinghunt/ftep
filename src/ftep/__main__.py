@@ -48,7 +48,7 @@ def main(args=None):
         "-c",
         "--columns",
         "--fields",
-        help="Columns/fields to output. Comma-separated list. Not sanity checked, so up to you to get it right. or use one of the presets (SMALL,DEFAULT,BIG)",
+        help="Columns/fields to output. Comma-separated list. Not sanity checked, so up to you to get it right. or use one of the presets (SMALL,DEFAULT,BIG,ALL)",
         metavar="col1,col2,...",
         default="DEFAULT",
     )
@@ -64,9 +64,9 @@ def main(args=None):
     subparser_get_fields = subparsers.add_parser(
         "get_fields",
         parents=[common_parser],
-        help="Get availble fields for a given data type (eg read_run)",
+        help="Get available fields for a given data type (eg read_run)",
         usage="ftep get_fields [options] data_type",
-        description="Get availble fields for a given data type (eg read_run)",
+        description="Get available fields for a given data type (eg read_run). This uses the documented query to get all the available columns. But in reality, doesn't return the same as what you get if you use 'ALL' in the -c option with `ftep search`. So if you want a proper list of all fields, run with -c ALL on a real accession and see what you get",
     )
     subparser_get_fields.add_argument(
         "data_type",

@@ -80,7 +80,10 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
         logging.debug(f"results for {accession}: {new_results}")
         if outformat == "tsv":
             if columns is None:
-                columns = new_fields
+                if fields == ["ALL"]:
+                    columns = sorted(list(new_results[0].keys()))
+                else:
+                    columns = new_fields
                 print("input_accession", *columns, sep="\t")
             else:
                 assert set(columns) == set(new_fields)
