@@ -95,6 +95,8 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv"):
     if outformat == "json":
         print(json.dumps(results, indent=2))
 
+    return results
+
 
 def get_allowed_fields(data_type):
     url = "https://www.ebi.ac.uk/ena/portal/api/searchFields?"
