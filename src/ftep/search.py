@@ -13,7 +13,10 @@ def search_key_value(query_type, accession):
             f"accession={accession}",
         )
     elif query_type == "sample":
-        return "query", f"sample_accession={accession}"
+        return (
+            "query",
+            f"sample_accession={accession} OR secondary_sample_accession={accession}",
+        )
     elif query_type == "run":
         return "query", f"run_accession={accession}"
     else:
@@ -43,7 +46,9 @@ def ena_query(accession, accession_type, fields=None, sample2run=False):
     return fields, results
 
 
-def search(accession=None, acc_file=None, fields=None, outformat="tsv", sample2run=False):
+def search(
+    accession=None, acc_file=None, fields=None, outformat="tsv", sample2run=False
+):
     to_search = []
     if accession is not None:
         to_search.append(accession)
@@ -70,7 +75,10 @@ def search(accession=None, acc_file=None, fields=None, outformat="tsv", sample2r
 
         try:
             new_fields, new_results = ena_query(
-                fixed_accession, result_type, fields=fields, sample2run=sample2run,
+                fixed_accession,
+                result_type,
+                fields=fields,
+                sample2run=sample2run,
             )
         except:
             logging.warning(f"Error getting data for accession {accession}. Skipping")
