@@ -22,6 +22,10 @@ URL_SEARCH_DATA = {
         "main_type": "search",
         "result": "read_run",
     },
+    "experiment": {
+        "main_type": "search",
+        "result": "read_run",
+    },
 }
 
 
@@ -78,3 +82,5 @@ FIELD_PRESETS = {
         "BIG": RUN_BIG,
     },
 }
+
+FIELD_PRESETS["experiment"] = FIELD_PRESETS["run"]

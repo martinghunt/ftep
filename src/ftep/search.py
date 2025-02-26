@@ -19,6 +19,8 @@ def search_key_value(query_type, accession):
         )
     elif query_type == "run":
         return "query", f"run_accession={accession}"
+    elif query_type == "experiment":
+        return "query", f"experiment_accession={accession}"
     else:
         raise NotImplementedError(f"query_type")
 
@@ -32,7 +34,6 @@ def ena_query(accession, accession_type, fields=None, sample2run=False):
     url = f"{constants.BASE_PORTAL_URL}{url_data['main_type']}?"
 
     data = {"result": url_data["result"], search_key: search_val, "format": "json"}
-
     field_presets = constants.FIELD_PRESETS[accession_type]
     if fields is None:
         fields = ["DEFAULT"]
