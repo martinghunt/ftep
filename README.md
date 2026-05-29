@@ -4,6 +4,10 @@ Finding things in the ENA portal.
 
 Currently supported: run, sample, assembly accessions.
 
+This repository was developed with substantial coding assistance from
+[OpenAI Codex](https://openai.com/codex), which helped with implementation,
+refactoring, tests, documentation, and benchmarking under human direction and review.
+
 
 ## Install
 
