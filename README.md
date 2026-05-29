@@ -101,3 +101,29 @@ func main() {
 	fmt.Println(results[0].Records)
 }
 ```
+
+
+## For developers
+
+Releases are made from Git tags. The GitHub Actions release workflow runs when a tag matching `v*.*.*` is pushed. It runs the tests, builds binaries for Darwin, Linux, and Windows on amd64 and arm64, then uploads the archives to the GitHub release.
+
+Before tagging, run:
+
+```
+go test ./...
+./build.sh
+```
+
+Then create and push the release tag:
+
+```
+git tag -a v1.2.3 -m "ftep v1.2.3"
+git push origin main
+git push origin v1.2.3
+```
+
+For a local check of the full release matrix:
+
+```
+./build.sh --release --version v1.2.3
+```
