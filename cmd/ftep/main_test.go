@@ -33,7 +33,7 @@ func TestRunSearchWritesTSV(t *testing.T) {
 
 	withTestClient(t, server)
 	code, stdout := captureStdout(t, func() int {
-		return runSearch([]string{"-a", "SAMN05276490"})
+		return run([]string{"search", "-a", "SAMN05276490"})
 	})
 
 	if code != 0 {
@@ -65,7 +65,7 @@ func TestRunSearchWritesJSON(t *testing.T) {
 
 	withTestClient(t, server)
 	code, stdout := captureStdout(t, func() int {
-		return runSearch([]string{"-a", "ERR123456", "--outfmt", "json"})
+		return run([]string{"search", "-a", "ERR123456", "--outfmt", "json"})
 	})
 
 	if code != 0 {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/martinghunt/ftep"
+	"github.com/spf13/cobra"
 )
 
 var version = "local"
@@ -25,148 +25,122 @@ func main() {
 }
 
 func run(args []string) int {
-	if len(args) == 0 {
-		usage(os.Stderr)
-		return 0
-	}
-
-	switch args[0] {
-	case "-h", "--help", "help":
-		usage(os.Stdout)
-		return 0
-	case "--version", "-version":
-		fmt.Fprintln(os.Stdout, version)
-		return 0
-	case "search":
-		return runSearch(args[1:])
-	case "get_fields":
-		return runGetFields(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
-		usage(os.Stderr)
-		return 2
-	}
-}
-
-func usage(w *os.File) {
-	fmt.Fprintln(w, `ftep: query the ENA
-
-Usage:
-  ftep <command> <options>
-
-Available commands:
-  search       General search from an accession or file of accessions
-  get_fields   Get available fields for a given data type, such as read_run
-
-Use "ftep <command> -h" for command options.`)
-}
-
-func runSearch(args []string) int {
-	var accession string
-	var accFile string
-	var columns string
-	var outfmt string
-	var sampleToRun bool
-	var debug bool
-
-	fs := flag.NewFlagSet("search", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), `Usage:
-  ftep search [options]
-
-Options:`)
-		fs.PrintDefaults()
-	}
-	fs.BoolVar(&debug, "debug", false, "More verbose logging")
-	fs.StringVar(&accession, "a", "", "Accession to search for")
-	fs.StringVar(&accession, "accession", "", "Accession to search for")
-	fs.StringVar(&accFile, "f", "", "File of accessions to search for, one per line")
-	fs.StringVar(&accFile, "acc_file", "", "File of accessions to search for, one per line")
-	fs.StringVar(&columns, "c", "DEFAULT", "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
-	fs.StringVar(&columns, "columns", "DEFAULT", "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
-	fs.StringVar(&columns, "fields", "DEFAULT", "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
-	fs.BoolVar(&sampleToRun, "s2r", false, "'sample to run': run data is reported for sample accessions")
-	fs.StringVar(&outfmt, "outfmt", "tsv", "Output format: json or tsv")
-
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-	if fs.NArg() != 0 {
-		fmt.Fprintf(os.Stderr, "unexpected argument: %s\n", fs.Arg(0))
-		return 2
-	}
-	if (accession == "") == (accFile == "") {
-		fmt.Fprintln(os.Stderr, "exactly one of -a/--accession or -f/--acc_file is required")
-		return 2
-	}
-	if outfmt != "tsv" && outfmt != "json" {
-		fmt.Fprintf(os.Stderr, "unsupported --outfmt %q; expected json or tsv\n", outfmt)
-		return 2
-	}
-
-	accessions, err := accessionsFromInputs(accession, accFile)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-
-	fields := strings.Split(columns, ",")
-	client := newClient()
-	results, err := searchAccessions(context.Background(), client, accessions, fields, sampleToRun, debug)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-
-	if outfmt == "json" {
-		return writeJSON(os.Stdout, results)
-	}
-
-	if err := writeTSV(os.Stdout, results, fields); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	cmd := newRootCommand(os.Stdout, os.Stderr)
+	cmd.SetArgs(args)
+	if err := cmd.Execute(); err != nil {
 		return 1
 	}
 	return 0
 }
 
-func runGetFields(args []string) int {
+func newRootCommand(out io.Writer, errOut io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "ftep",
+		Short:         "query the ENA",
+		Version:       version,
+		SilenceUsage:  true,
+		SilenceErrors: false,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetVersionTemplate("{{.Version}}\n")
+	cmd.AddCommand(newSearchCommand(), newGetFieldsCommand())
+	return cmd
+}
+
+type searchOptions struct {
+	accession   string
+	accFile     string
+	columns     string
+	outfmt      string
+	sampleToRun bool
+	debug       bool
+}
+
+func newSearchCommand() *cobra.Command {
+	opts := searchOptions{
+		columns: "DEFAULT",
+		outfmt:  "tsv",
+	}
+	cmd := &cobra.Command{
+		Use:   "search",
+		Short: "General search from an accession or file of accessions",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return executeSearch(cmd, opts)
+		},
+	}
+
+	flags := cmd.Flags()
+	flags.BoolVar(&opts.debug, "debug", false, "More verbose logging")
+	flags.StringVarP(&opts.accession, "accession", "a", "", "Accession to search for")
+	flags.StringVarP(&opts.accFile, "acc-file", "f", "", "File of accessions to search for, one per line")
+	flags.StringVar(&opts.accFile, "acc_file", "", "File of accessions to search for, one per line")
+	flags.StringVarP(&opts.columns, "columns", "c", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
+	flags.StringVar(&opts.columns, "fields", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
+	flags.BoolVar(&opts.sampleToRun, "s2r", false, "'sample to run': run data is reported for sample accessions")
+	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json or tsv")
+	_ = flags.MarkHidden("acc_file")
+
+	return cmd
+}
+
+func executeSearch(cmd *cobra.Command, opts searchOptions) error {
+	if (opts.accession == "") == (opts.accFile == "") {
+		return fmt.Errorf("exactly one of -a/--accession or -f/--acc_file is required")
+	}
+	if opts.outfmt != "tsv" && opts.outfmt != "json" {
+		return fmt.Errorf("unsupported --outfmt %q; expected json or tsv", opts.outfmt)
+	}
+
+	accessions, err := accessionsFromInputs(opts.accession, opts.accFile)
+	if err != nil {
+		return err
+	}
+
+	fields := strings.Split(opts.columns, ",")
+	client := newClient()
+	results, err := searchAccessions(cmd.Context(), client, accessions, fields, opts.sampleToRun, opts.debug, cmd.ErrOrStderr())
+	if err != nil {
+		return err
+	}
+
+	if opts.outfmt == "json" {
+		return writeJSON(cmd.OutOrStdout(), results)
+	}
+
+	return writeTSV(cmd.OutOrStdout(), results, fields)
+}
+
+func newGetFieldsCommand() *cobra.Command {
 	var debug bool
 
-	fs := flag.NewFlagSet("get_fields", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), `Usage:
-  ftep get_fields [options] data_type
+	cmd := &cobra.Command{
+		Use:   "get_fields data_type",
+		Short: "Get available fields for a given data type, such as read_run",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if debug {
+				log.Printf("getting fields for %s", args[0])
+			}
 
-Options:`)
-		fs.PrintDefaults()
+			client := newClient()
+			text, err := client.GetAllowedFields(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), text)
+			if !strings.HasSuffix(text, "\n") {
+				fmt.Fprintln(cmd.OutOrStdout())
+			}
+			return nil
+		},
 	}
-	fs.BoolVar(&debug, "debug", false, "More verbose logging")
-
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-	if fs.NArg() != 1 {
-		fs.Usage()
-		return 2
-	}
-
-	if debug {
-		log.Printf("getting fields for %s", fs.Arg(0))
-	}
-
-	client := newClient()
-	text, err := client.GetAllowedFields(context.Background(), fs.Arg(0))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	fmt.Print(text)
-	if !strings.HasSuffix(text, "\n") {
-		fmt.Println()
-	}
-	return 0
+	cmd.Flags().BoolVar(&debug, "debug", false, "More verbose logging")
+	return cmd
 }
 
 func accessionsFromInputs(accession string, accFile string) ([]string, error) {
@@ -176,7 +150,7 @@ func accessionsFromInputs(accession string, accFile string) ([]string, error) {
 	return ftep.ReadAccessionsFile(accFile)
 }
 
-func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, sampleToRun bool, debug bool) ([]ftep.SearchResult, error) {
+func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, sampleToRun bool, debug bool, errOut io.Writer) ([]ftep.SearchResult, error) {
 	if len(accessions) == 0 {
 		return nil, errors.New("no accessions provided")
 	}
@@ -192,16 +166,16 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 	for _, accession := range accessions {
 		fixedAccession, accessionType, ok := ftep.IdentifyAccession(accession)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "%s\t%s\n", accession, "")
+			fmt.Fprintf(errOut, "%s\t%s\n", accession, "")
 			return nil, fmt.Errorf("error getting result types from accessions")
 		}
 		if firstType == "" {
 			firstType = accessionType
 		} else if accessionType != firstType {
 			for _, searched := range toSearch {
-				fmt.Fprintf(os.Stderr, "%s\t%s\n", searched.input, searched.typ)
+				fmt.Fprintf(errOut, "%s\t%s\n", searched.input, searched.typ)
 			}
-			fmt.Fprintf(os.Stderr, "%s\t%s\n", accession, accessionType)
+			fmt.Fprintf(errOut, "%s\t%s\n", accession, accessionType)
 			return nil, fmt.Errorf("error getting result types from accessions")
 		}
 
@@ -239,7 +213,7 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 	return results, nil
 }
 
-func writeJSON(out io.Writer, results []ftep.SearchResult) int {
+func writeJSON(out io.Writer, results []ftep.SearchResult) error {
 	byAccession := make(map[string][]ftep.Record, len(results))
 	for _, result := range results {
 		byAccession[result.InputAccession] = result.Records
@@ -247,11 +221,10 @@ func writeJSON(out io.Writer, results []ftep.SearchResult) int {
 
 	encoded, err := json.MarshalIndent(byAccession, "", "  ")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return err
 	}
 	fmt.Fprintln(out, string(encoded))
-	return 0
+	return nil
 }
 
 func writeTSV(out io.Writer, results []ftep.SearchResult, requestedFields []string) error {
