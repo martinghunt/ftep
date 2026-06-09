@@ -82,6 +82,21 @@ Get runs for study/project `PRJEB1787`:
 ftep search -a PRJEB1787 --level run
 ```
 
+Get a FASTQ download manifest for sample `SAMN05276490`:
+```
+ftep reads -a SAMN05276490
+```
+
+Print `wget` commands to download FASTQs for sample `SAMN05276490`:
+```
+ftep reads -a SAMN05276490 --format wget
+```
+
+Print MD5 checksum lines for those FASTQs:
+```
+ftep reads -a SAMN05276490 --format md5
+```
+
 Get metadata for study accession `ERP001736`:
 ```
 ftep search -a ERP001736
