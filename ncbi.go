@@ -1,4 +1,4 @@
-package ftep
+package ichsm
 
 import (
 	"bytes"
@@ -45,7 +45,7 @@ func (c *Client) queryNCBI(ctx context.Context, inputAccession string, accession
 	return resultType, resolvedFields, []Record{record}, nil
 }
 
-// ResolveNCBIResultLevel returns the normalized ftep result level supplied by
+// ResolveNCBIResultLevel returns the normalized ichsm result level supplied by
 // NCBI for an accession type.
 func ResolveNCBIResultLevel(inputType AccessionType, level AccessionType) (AccessionType, error) {
 	if level == "" {
@@ -298,7 +298,7 @@ func ncbiAssemblyBioProject(summary Record) string {
 func (c *Client) addNCBIParams(params url.Values) {
 	tool := strings.TrimSpace(c.NCBITool)
 	if tool == "" {
-		tool = "ftep"
+		tool = "ichsm"
 	}
 	params.Set("tool", tool)
 	if c.NCBIAPIKey != "" {

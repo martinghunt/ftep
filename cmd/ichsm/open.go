@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/martinghunt/ftep"
+	"github.com/martinghunt/ichsm"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func newOpenCommand() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.StringVarP(&opts.accession, "accession", "a", "", "Accession to open")
-	flags.StringVar(&opts.source, "source", string(ftep.SearchSourceAuto), "Browser source: auto, ena, or ncbi")
+	flags.StringVar(&opts.source, "source", string(ichsm.SearchSourceAuto), "Browser source: auto, ena, or ncbi")
 	flags.BoolVar(&opts.printURL, "print-url", false, "Print the browser URL instead of opening it")
 
 	return cmd
@@ -86,13 +86,13 @@ func openAccessionFromInputs(flagAccession string, args []string) (string, error
 	return "", fmt.Errorf("accession is required")
 }
 
-func accessionBrowserURL(accession string, source ftep.SearchSource) (string, error) {
+func accessionBrowserURL(accession string, source ichsm.SearchSource) (string, error) {
 	accession = strings.TrimSpace(accession)
 	if accession == "" {
 		return "", fmt.Errorf("accession is required")
 	}
 
-	_, accessionType, ok := ftep.IdentifyAccession(accession)
+	_, accessionType, ok := ichsm.IdentifyAccession(accession)
 	if !ok {
 		return "", fmt.Errorf("accession format not recognised: %s", accession)
 	}
@@ -103,32 +103,32 @@ func accessionBrowserURL(accession string, source ftep.SearchSource) (string, er
 	}
 
 	switch source {
-	case ftep.SearchSourceENA:
+	case ichsm.SearchSourceENA:
 		return enaBrowserViewBaseURL + url.PathEscape(accession), nil
-	case ftep.SearchSourceNCBI:
+	case ichsm.SearchSourceNCBI:
 		return ncbiBrowserURL(accession, accessionType), nil
 	default:
 		return "", fmt.Errorf("unsupported source %q; expected auto, ena, or ncbi", source)
 	}
 }
 
-func openBrowserSource(accession string, accessionType ftep.AccessionType, source ftep.SearchSource) (ftep.SearchSource, error) {
+func openBrowserSource(accession string, accessionType ichsm.AccessionType, source ichsm.SearchSource) (ichsm.SearchSource, error) {
 	switch source {
-	case ftep.SearchSourceAuto:
+	case ichsm.SearchSourceAuto:
 		if enaBrowserSupports(accession, accessionType) {
-			return ftep.SearchSourceENA, nil
+			return ichsm.SearchSourceENA, nil
 		}
 		if ncbiBrowserSupports(accessionType) {
-			return ftep.SearchSourceNCBI, nil
+			return ichsm.SearchSourceNCBI, nil
 		}
-	case ftep.SearchSourceENA:
+	case ichsm.SearchSourceENA:
 		if enaBrowserSupports(accession, accessionType) {
-			return ftep.SearchSourceENA, nil
+			return ichsm.SearchSourceENA, nil
 		}
 		return "", fmt.Errorf("accession is not supported by the ENA browser: %s", accession)
-	case ftep.SearchSourceNCBI:
+	case ichsm.SearchSourceNCBI:
 		if ncbiBrowserSupports(accessionType) {
-			return ftep.SearchSourceNCBI, nil
+			return ichsm.SearchSourceNCBI, nil
 		}
 		return "", fmt.Errorf("accession is not supported by the NCBI browser: %s", accession)
 	}
@@ -136,33 +136,33 @@ func openBrowserSource(accession string, accessionType ftep.AccessionType, sourc
 	return "", fmt.Errorf("accession is not supported by an available browser: %s", accession)
 }
 
-func enaBrowserSupports(accession string, accessionType ftep.AccessionType) bool {
+func enaBrowserSupports(accession string, accessionType ichsm.AccessionType) bool {
 	upper := strings.ToUpper(strings.TrimSpace(accession))
 	switch accessionType {
-	case ftep.AccessionTypeAssembly:
+	case ichsm.AccessionTypeAssembly:
 		return strings.HasPrefix(upper, "GCA_")
-	case ftep.AccessionTypeSequence, ftep.AccessionTypeCoding:
+	case ichsm.AccessionTypeSequence, ichsm.AccessionTypeCoding:
 		return !strings.Contains(upper, "_")
 	default:
 		return true
 	}
 }
 
-func ncbiBrowserSupports(accessionType ftep.AccessionType) bool {
+func ncbiBrowserSupports(accessionType ichsm.AccessionType) bool {
 	switch accessionType {
-	case ftep.AccessionTypeAssembly, ftep.AccessionTypeContigSet, ftep.AccessionTypeWGSSet, ftep.AccessionTypeTSASet, ftep.AccessionTypeTLSSet, ftep.AccessionTypeSequence, ftep.AccessionTypeCoding:
+	case ichsm.AccessionTypeAssembly, ichsm.AccessionTypeContigSet, ichsm.AccessionTypeWGSSet, ichsm.AccessionTypeTSASet, ichsm.AccessionTypeTLSSet, ichsm.AccessionTypeSequence, ichsm.AccessionTypeCoding:
 		return true
 	default:
 		return false
 	}
 }
 
-func ncbiBrowserURL(accession string, accessionType ftep.AccessionType) string {
+func ncbiBrowserURL(accession string, accessionType ichsm.AccessionType) string {
 	accession = strings.ToUpper(strings.TrimSpace(accession))
 	switch accessionType {
-	case ftep.AccessionTypeAssembly:
+	case ichsm.AccessionTypeAssembly:
 		return ncbiAssemblyBrowserBaseURL + url.PathEscape(accession) + "/"
-	case ftep.AccessionTypeCoding:
+	case ichsm.AccessionTypeCoding:
 		return ncbiProteinBrowserBaseURL + url.PathEscape(accession)
 	default:
 		return ncbiNuccoreBrowserBaseURL + url.PathEscape(accession)

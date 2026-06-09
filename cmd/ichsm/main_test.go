@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/martinghunt/ftep"
+	"github.com/martinghunt/ichsm"
 )
 
 func TestRunSearchWritesTSV(t *testing.T) {
@@ -488,7 +488,7 @@ func TestRunGetFieldsListsDataTypes(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	const want = "resultId\tdescription\tprimaryAccessionType\tftep_search\n" +
+	const want = "resultId\tdescription\tprimaryAccessionType\tichsm_search\n" +
 		"read_run\tRaw reads\trun_accession\tyes\n" +
 		"sample\tSamples\tsample_accession\tyes\n" +
 		"tls_set\tTargeted locus study contig sets\taccession\tyes\n" +
@@ -544,7 +544,7 @@ func TestRunGetFieldsWritesTable(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	const want = "resultId  description  ftep_search\n" +
+	const want = "resultId  description  ichsm_search\n" +
 		"sample    Samples      yes\n" +
 		"analysis  Analyses     no\n"
 	if stdout != want {
@@ -572,10 +572,10 @@ func TestWriteReadsCurl(t *testing.T) {
 }
 
 func TestWriteTSVAllFieldsSortsColumnsAndFormatsNil(t *testing.T) {
-	results := []ftep.SearchResult{
+	results := []ichsm.SearchResult{
 		{
 			InputAccession: "SAMN05276490",
-			Records: []ftep.Record{
+			Records: []ichsm.Record{
 				{
 					"z_field": "last",
 					"a_field": "first",
@@ -618,8 +618,8 @@ func withTestClient(t *testing.T, server *httptest.Server) {
 	t.Helper()
 
 	previous := newClient
-	newClient = func() *ftep.Client {
-		return &ftep.Client{
+	newClient = func() *ichsm.Client {
+		return &ichsm.Client{
 			BaseURL:     server.URL,
 			NCBIBaseURL: server.URL,
 			HTTPClient:  server.Client(),

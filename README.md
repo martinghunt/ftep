@@ -1,9 +1,9 @@
-# ftep
+# ichsm
 
 Finding sequence metadata from ENA and NCBI.
 
 Currently supported: run, experiment, sample, study/project, assembly, INSDC sequence/coding,
-WGS/TSA/TLS contig set, and selected NCBI/RefSeq accessions. `ftep search`
+WGS/TSA/TLS contig set, and selected NCBI/RefSeq accessions. `ichsm search`
 uses `--source auto` by default: it queries ENA first where applicable, then
 falls back to NCBI for accessions such as `GCF_`, `NC_`, and `WP_`.
 
@@ -14,16 +14,16 @@ refactoring, tests, documentation, and benchmarking under human direction and re
 
 ## Install
 
-The simplest way to install `ftep` is to download the latest prebuilt binary from the GitHub releases page:
+The simplest way to install `ichsm` is to download the latest prebuilt binary from the GitHub releases page:
 
-- https://github.com/martinghunt/ftep/releases/latest
+- https://github.com/martinghunt/ichsm/releases/latest
 
 Choose the archive or binary matching your OS and CPU architecture.
 
 After installing, check the version with:
 
 ```
-ftep --version
+ichsm --version
 ```
 
 If you want to build locally instead:
@@ -32,7 +32,7 @@ If you want to build locally instead:
 ./build.sh
 ```
 
-That builds `ftep` for the current OS and architecture into `./build/ftep` or `./build/ftep.exe`.
+That builds `ichsm` for the current OS and architecture into `./build/ichsm` or `./build/ichsm.exe`.
 Local builds report version `dev` unless you pass an explicit release version.
 
 For a cross-platform release build:
@@ -46,155 +46,155 @@ For a cross-platform release build:
 
 Get metadata for sample `SAMN05276490` in (default) TSV format:
 ```
-ftep search -a SAMN05276490
+ichsm search -a SAMN05276490
 ```
 
 Get metadata for accessions (one per line, must all be same type eg runs, samples etc)
 in the file `acc.txt`:
 ```
-ftep search -f acc.txt
+ichsm search -f acc.txt
 ```
 
 Get metadata for sample `SAMN05276490` in JSON format:
 ```
-ftep search -a SAMN05276490 --outfmt json
+ichsm search -a SAMN05276490 --outfmt json
 ```
 
 Get metadata for sample `SAMN05276490` as an aligned table:
 ```
-ftep search -a SAMN05276490 --outfmt table
+ichsm search -a SAMN05276490 --outfmt table
 ```
 
 Get all available metadata for sample `SAMN05276490`:
 ```
-ftep search -a SAMN05276490 -c ALL
+ichsm search -a SAMN05276490 -c ALL
 ```
 
 Get runs for sample `SAMN05276490`:
 ```
-ftep search -a SAMN05276490 --level run
+ichsm search -a SAMN05276490 --level run
 ```
 
 Get metadata for study/project `PRJEB1787`:
 ```
-ftep search -a PRJEB1787
+ichsm search -a PRJEB1787
 ```
 
 Get samples for study/project `PRJEB1787`:
 ```
-ftep search -a PRJEB1787 --level sample
+ichsm search -a PRJEB1787 --level sample
 ```
 
 Get runs for study/project `PRJEB1787`:
 ```
-ftep search -a PRJEB1787 --level run
+ichsm search -a PRJEB1787 --level run
 ```
 
 Get a FASTQ download manifest for sample `SAMN05276490`:
 ```
-ftep reads -a SAMN05276490
+ichsm reads -a SAMN05276490
 ```
 
 Get the FASTQ download manifest as an aligned table:
 ```
-ftep reads -a SAMN05276490 --outfmt table
+ichsm reads -a SAMN05276490 --outfmt table
 ```
 
 Print `wget` commands to download FASTQs for sample `SAMN05276490`:
 ```
-ftep reads -a SAMN05276490 --outfmt wget
+ichsm reads -a SAMN05276490 --outfmt wget
 ```
 
 Print MD5 checksum lines for those FASTQs:
 ```
-ftep reads -a SAMN05276490 --outfmt md5
+ichsm reads -a SAMN05276490 --outfmt md5
 ```
 
 Open sample `SAMN05276490` in the ENA browser:
 ```
-ftep open SAMN05276490
+ichsm open SAMN05276490
 ```
 
 Print the ENA browser URL for run `SRR3675520`:
 ```
-ftep open SRR3675520 --print-url
+ichsm open SRR3675520 --print-url
 ```
 
 Print the NCBI browser URL for a RefSeq assembly:
 ```
-ftep open GCF_000001405.40 --print-url
+ichsm open GCF_000001405.40 --print-url
 ```
 
 Print the NCBI protein URL for a RefSeq protein:
 ```
-ftep open WP_002248791.1 --print-url
+ichsm open WP_002248791.1 --print-url
 ```
 
 Force NCBI for an accession that is also available from ENA:
 ```
-ftep open U49845.1 --source ncbi --print-url
+ichsm open U49845.1 --source ncbi --print-url
 ```
 
-List available ENA data types and whether `ftep search` supports them, with
+List available ENA data types and whether `ichsm search` supports them, with
 supported types first:
 ```
-ftep get_fields --outfmt table
+ichsm get_fields --outfmt table
 ```
 
 List available fields for ENA data type `read_run`:
 ```
-ftep get_fields read_run
+ichsm get_fields read_run
 ```
 
 Get metadata for study accession `ERP001736`:
 ```
-ftep search -a ERP001736
+ichsm search -a ERP001736
 ```
 
 Get metadata for run `SRR3675520`:
 ```
-ftep search -a SRR3675520
+ichsm search -a SRR3675520
 ```
 
 Get metadata for assembly `GCA_000195955.2`:
 ```
-ftep search -a GCA_000195955.2
+ichsm search -a GCA_000195955.2
 ```
 
 Get metadata for WGS master accession `AGQU00000000.1`:
 ```
-ftep search -a AGQU00000000.1
+ichsm search -a AGQU00000000.1
 ```
 
 Get metadata for TSA master accession `GHIQ00000000.1`:
 ```
-ftep search -a GHIQ00000000.1
+ichsm search -a GHIQ00000000.1
 ```
 
 Get metadata for INSDC nucleotide sequence `U49845.1`:
 ```
-ftep search -a U49845.1
+ichsm search -a U49845.1
 ```
 
 Get metadata for INSDC coding/protein accession `AAA98665.1`:
 ```
-ftep search -a AAA98665.1
+ichsm search -a AAA98665.1
 ```
 
 Get metadata for an NCBI RefSeq assembly, falling back to NCBI automatically:
 ```
-ftep search -a GCF_000001405.40
+ichsm search -a GCF_000001405.40
 ```
 
 Get metadata for an NCBI protein accession:
 ```
-ftep search -a WP_002248791.1
+ichsm search -a WP_002248791.1
 ```
 
 Force a metadata source when needed:
 ```
-ftep search -a U49845.1 --source ena
-ftep search -a WP_002248791.1 --source ncbi
+ichsm search -a U49845.1 --source ena
+ichsm search -a WP_002248791.1 --source ncbi
 ```
 
 When NCBI is queried, set `NCBI_API_KEY` and `NCBI_EMAIL`, or pass
@@ -212,16 +212,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/martinghunt/ftep"
+	"github.com/martinghunt/ichsm"
 )
 
 func main() {
-	client := ftep.NewClient()
-	results, err := client.Search(context.Background(), ftep.SearchOptions{
+	client := ichsm.NewClient()
+	results, err := client.Search(context.Background(), ichsm.SearchOptions{
 		Accessions: []string{"SAMN05276490"},
 		Fields:     []string{"DEFAULT"},
-		Level:      ftep.AccessionTypeRun,
-		Source:     ftep.SearchSourceAuto,
+		Level:      ichsm.AccessionTypeRun,
+		Source:     ichsm.SearchSourceAuto,
 	})
 	if err != nil {
 		panic(err)
@@ -246,7 +246,7 @@ go test ./...
 Then create and push the release tag:
 
 ```
-git tag -a v1.2.3 -m "ftep v1.2.3"
+git tag -a v1.2.3 -m "ichsm v1.2.3"
 git push origin main
 git push origin v1.2.3
 ```

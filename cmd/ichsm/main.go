@@ -11,12 +11,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/martinghunt/ftep"
+	"github.com/martinghunt/ichsm"
 	"github.com/spf13/cobra"
 )
 
 var version = "local"
-var newClient = ftep.NewClient
+var newClient = ichsm.NewClient
 
 const (
 	outputFormatJSON  = "json"
@@ -25,7 +25,7 @@ const (
 )
 
 func main() {
-	log.SetPrefix("[ftep] ")
+	log.SetPrefix("[ichsm] ")
 	log.SetFlags(0)
 	os.Exit(run(os.Args[1:]))
 }
@@ -41,7 +41,7 @@ func run(args []string) int {
 
 func newRootCommand(out io.Writer, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "ftep",
+		Use:           "ichsm",
 		Short:         "query the ENA",
 		Version:       version,
 		SilenceUsage:  true,
@@ -91,7 +91,7 @@ func newSearchCommand() *cobra.Command {
 	flags.StringVarP(&opts.columns, "columns", "c", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.columns, "fields", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, assembly, sequence, coding, contig_set, wgs_set, tsa_set, or tls_set. Default is the input accession level")
-	flags.StringVar(&opts.source, "source", string(ftep.SearchSourceAuto), "Metadata source: auto, ena, or ncbi")
+	flags.StringVar(&opts.source, "source", string(ichsm.SearchSourceAuto), "Metadata source: auto, ena, or ncbi")
 	flags.StringVar(&opts.apiKey, "api-key", "", "NCBI API key; defaults to NCBI_API_KEY")
 	flags.StringVar(&opts.email, "email", "", "Email sent to NCBI; defaults to NCBI_EMAIL")
 	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json, table, or tsv")
@@ -167,43 +167,43 @@ func parseOutputFormat(format string, allowJSON bool) (string, error) {
 	return "", fmt.Errorf("unsupported --outfmt %q; expected table or tsv", format)
 }
 
-func parseSearchLevel(level string) (ftep.AccessionType, error) {
+func parseSearchLevel(level string) (ichsm.AccessionType, error) {
 	switch strings.ToLower(strings.TrimSpace(level)) {
 	case "":
 		return "", nil
-	case string(ftep.AccessionTypeStudy):
-		return ftep.AccessionTypeStudy, nil
-	case string(ftep.AccessionTypeSample):
-		return ftep.AccessionTypeSample, nil
-	case string(ftep.AccessionTypeRun):
-		return ftep.AccessionTypeRun, nil
-	case string(ftep.AccessionTypeAssembly):
-		return ftep.AccessionTypeAssembly, nil
-	case string(ftep.AccessionTypeSequence):
-		return ftep.AccessionTypeSequence, nil
-	case string(ftep.AccessionTypeCoding):
-		return ftep.AccessionTypeCoding, nil
-	case string(ftep.AccessionTypeContigSet):
-		return ftep.AccessionTypeContigSet, nil
-	case string(ftep.AccessionTypeWGSSet):
-		return ftep.AccessionTypeWGSSet, nil
-	case string(ftep.AccessionTypeTSASet):
-		return ftep.AccessionTypeTSASet, nil
-	case string(ftep.AccessionTypeTLSSet):
-		return ftep.AccessionTypeTLSSet, nil
+	case string(ichsm.AccessionTypeStudy):
+		return ichsm.AccessionTypeStudy, nil
+	case string(ichsm.AccessionTypeSample):
+		return ichsm.AccessionTypeSample, nil
+	case string(ichsm.AccessionTypeRun):
+		return ichsm.AccessionTypeRun, nil
+	case string(ichsm.AccessionTypeAssembly):
+		return ichsm.AccessionTypeAssembly, nil
+	case string(ichsm.AccessionTypeSequence):
+		return ichsm.AccessionTypeSequence, nil
+	case string(ichsm.AccessionTypeCoding):
+		return ichsm.AccessionTypeCoding, nil
+	case string(ichsm.AccessionTypeContigSet):
+		return ichsm.AccessionTypeContigSet, nil
+	case string(ichsm.AccessionTypeWGSSet):
+		return ichsm.AccessionTypeWGSSet, nil
+	case string(ichsm.AccessionTypeTSASet):
+		return ichsm.AccessionTypeTSASet, nil
+	case string(ichsm.AccessionTypeTLSSet):
+		return ichsm.AccessionTypeTLSSet, nil
 	default:
 		return "", fmt.Errorf("unsupported --level %q; expected study, sample, run, assembly, sequence, coding, contig_set, wgs_set, tsa_set, or tls_set", level)
 	}
 }
 
-func parseSearchSource(source string) (ftep.SearchSource, error) {
+func parseSearchSource(source string) (ichsm.SearchSource, error) {
 	switch strings.ToLower(strings.TrimSpace(source)) {
-	case "", string(ftep.SearchSourceAuto):
-		return ftep.SearchSourceAuto, nil
-	case string(ftep.SearchSourceENA):
-		return ftep.SearchSourceENA, nil
-	case string(ftep.SearchSourceNCBI):
-		return ftep.SearchSourceNCBI, nil
+	case "", string(ichsm.SearchSourceAuto):
+		return ichsm.SearchSourceAuto, nil
+	case string(ichsm.SearchSourceENA):
+		return ichsm.SearchSourceENA, nil
+	case string(ichsm.SearchSourceNCBI):
+		return ichsm.SearchSourceNCBI, nil
 	default:
 		return "", fmt.Errorf("unsupported --source %q; expected auto, ena, or ncbi", source)
 	}
@@ -231,7 +231,7 @@ func newGetFieldsCommand() *cobra.Command {
 				}
 				text, err = client.GetResultTypes(cmd.Context())
 				if err == nil {
-					text = appendFTEPSearchColumn(text)
+					text = appendICHSMSearchColumn(text)
 				}
 			} else {
 				if debug {
@@ -261,7 +261,7 @@ func writeTextWithTrailingNewline(out io.Writer, text string) error {
 	return nil
 }
 
-func appendFTEPSearchColumn(text string) string {
+func appendICHSMSearchColumn(text string) string {
 	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
 	if len(lines) == 0 || lines[0] == "" {
 		return text
@@ -281,7 +281,7 @@ func appendFTEPSearchColumn(text string) string {
 		}
 		rows = append(rows, resultTypeRow{
 			resultType: fields[0],
-			supported:  ftepSearchSupportsResult(fields[0]),
+			supported:  ichsmSearchSupportsResult(fields[0]),
 			line:       line,
 		})
 	}
@@ -293,14 +293,14 @@ func appendFTEPSearchColumn(text string) string {
 	})
 
 	out := make([]string, 0, len(lines))
-	out = append(out, lines[0]+"\tftep_search")
+	out = append(out, lines[0]+"\tichsm_search")
 	for _, row := range rows {
 		out = append(out, row.line+"\t"+yesNo(row.supported))
 	}
 	return strings.Join(out, "\n") + "\n"
 }
 
-func ftepSearchSupportsResult(resultType string) bool {
+func ichsmSearchSupportsResult(resultType string) bool {
 	switch resultType {
 	case "assembly", "coding", "read_run", "sample", "sequence", "study", "tls_set", "tsa_set", "wgs_set":
 		return true
@@ -320,10 +320,10 @@ func accessionsFromInputs(accession string, accFile string) ([]string, error) {
 	if accession != "" {
 		return []string{accession}, nil
 	}
-	return ftep.ReadAccessionsFile(accFile)
+	return ichsm.ReadAccessionsFile(accFile)
 }
 
-func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, level ftep.AccessionType, source ftep.SearchSource, debug bool, errOut io.Writer) ([]ftep.SearchResult, error) {
+func searchAccessions(ctx context.Context, client *ichsm.Client, accessions []string, fields []string, level ichsm.AccessionType, source ichsm.SearchSource, debug bool, errOut io.Writer) ([]ichsm.SearchResult, error) {
 	if len(accessions) == 0 {
 		return nil, errors.New("no accessions provided")
 	}
@@ -331,13 +331,13 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 	type accessionSearch struct {
 		input string
 		fixed string
-		typ   ftep.AccessionType
+		typ   ichsm.AccessionType
 	}
 
 	toSearch := make([]accessionSearch, 0, len(accessions))
-	var firstType ftep.AccessionType
+	var firstType ichsm.AccessionType
 	for _, accession := range accessions {
-		fixedAccession, accessionType, ok := ftep.IdentifyAccession(accession)
+		fixedAccession, accessionType, ok := ichsm.IdentifyAccession(accession)
 		if !ok {
 			fmt.Fprintf(errOut, "%s\t%s\n", accession, "")
 			return nil, fmt.Errorf("error getting result types from accessions")
@@ -351,14 +351,14 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 			fmt.Fprintf(errOut, "%s\t%s\n", accession, accessionType)
 			return nil, fmt.Errorf("error getting result types from accessions")
 		}
-		if _, err := ftep.ResolveSearchLevel(accessionType, level); err != nil {
+		if _, err := ichsm.ResolveSearchLevel(accessionType, level); err != nil {
 			return nil, err
 		}
 
 		toSearch = append(toSearch, accessionSearch{input: accession, fixed: fixedAccession, typ: accessionType})
 	}
 
-	results := make([]ftep.SearchResult, 0, len(toSearch))
+	results := make([]ichsm.SearchResult, 0, len(toSearch))
 	for _, accession := range toSearch {
 		if debug {
 			if level == "" {
@@ -381,7 +381,7 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 			continue
 		}
 
-		results = append(results, ftep.SearchResult{
+		results = append(results, ichsm.SearchResult{
 			InputAccession: accession.input,
 			FixedAccession: accession.fixed,
 			InputType:      accession.typ,
@@ -395,8 +395,8 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 	return results, nil
 }
 
-func writeJSON(out io.Writer, results []ftep.SearchResult) error {
-	byAccession := make(map[string][]ftep.Record, len(results))
+func writeJSON(out io.Writer, results []ichsm.SearchResult) error {
+	byAccession := make(map[string][]ichsm.Record, len(results))
 	for _, result := range results {
 		byAccession[result.InputAccession] = result.Records
 	}
@@ -409,7 +409,7 @@ func writeJSON(out io.Writer, results []ftep.SearchResult) error {
 	return nil
 }
 
-func writeTSV(out io.Writer, results []ftep.SearchResult, requestedFields []string) error {
+func writeTSV(out io.Writer, results []ichsm.SearchResult, requestedFields []string) error {
 	rows, err := searchRows(results, requestedFields)
 	if err != nil {
 		return err
@@ -417,7 +417,7 @@ func writeTSV(out io.Writer, results []ftep.SearchResult, requestedFields []stri
 	return writeDelimitedRows(out, rows, "\t")
 }
 
-func writeTable(out io.Writer, results []ftep.SearchResult, requestedFields []string) error {
+func writeTable(out io.Writer, results []ichsm.SearchResult, requestedFields []string) error {
 	rows, err := searchRows(results, requestedFields)
 	if err != nil {
 		return err
@@ -425,7 +425,7 @@ func writeTable(out io.Writer, results []ftep.SearchResult, requestedFields []st
 	return writeAlignedRows(out, rows)
 }
 
-func searchRows(results []ftep.SearchResult, requestedFields []string) ([][]string, error) {
+func searchRows(results []ichsm.SearchResult, requestedFields []string) ([][]string, error) {
 	var columns []string
 	var rows [][]string
 	for _, result := range results {
@@ -435,7 +435,7 @@ func searchRows(results []ftep.SearchResult, requestedFields []string) ([][]stri
 
 		if columns == nil {
 			if requestedAllFields(requestedFields) {
-				columns = ftep.SortedRecordKeys(result.Records[0])
+				columns = ichsm.SortedRecordKeys(result.Records[0])
 			} else {
 				columns = result.Fields
 			}

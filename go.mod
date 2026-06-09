@@ -1,4 +1,4 @@
-module github.com/martinghunt/ftep
+module github.com/martinghunt/ichsm
 
 go 1.21
 

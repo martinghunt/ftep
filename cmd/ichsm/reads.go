@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/martinghunt/ftep"
+	"github.com/martinghunt/ichsm"
 	"github.com/spf13/cobra"
 )
 
@@ -93,7 +93,7 @@ func executeReads(cmd *cobra.Command, opts readsOptions) error {
 	}
 
 	client := newClient()
-	results, err := searchAccessions(cmd.Context(), client, accessions, readsFields, ftep.AccessionTypeRun, ftep.SearchSourceENA, opts.debug, cmd.ErrOrStderr())
+	results, err := searchAccessions(cmd.Context(), client, accessions, readsFields, ichsm.AccessionTypeRun, ichsm.SearchSourceENA, opts.debug, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func parseReadsProtocol(protocol string) (string, error) {
 	}
 }
 
-func readFilesFromResults(results []ftep.SearchResult, protocol string, outputDir string) ([]readFile, error) {
+func readFilesFromResults(results []ichsm.SearchResult, protocol string, outputDir string) ([]readFile, error) {
 	var files []readFile
 	for _, result := range results {
 		for _, record := range result.Records {
@@ -153,7 +153,7 @@ func readFilesFromResults(results []ftep.SearchResult, protocol string, outputDi
 	return files, nil
 }
 
-func readFilesFromRecord(inputAccession string, record ftep.Record, protocol string, outputDir string) ([]readFile, error) {
+func readFilesFromRecord(inputAccession string, record ichsm.Record, protocol string, outputDir string) ([]readFile, error) {
 	runAccession := recordString(record, "run_accession")
 	urls := splitENAList(recordString(record, "fastq_ftp"))
 	md5s := splitENAList(recordString(record, "fastq_md5"))
@@ -190,7 +190,7 @@ func readFilesFromRecord(inputAccession string, record ftep.Record, protocol str
 	return files, nil
 }
 
-func recordString(record ftep.Record, key string) string {
+func recordString(record ichsm.Record, key string) string {
 	value := record[key]
 	if value == nil {
 		return ""

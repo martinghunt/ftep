@@ -1,4 +1,4 @@
-package ftep
+package ichsm
 
 const BasePortalURL = "https://www.ebi.ac.uk/ena/portal/api/"
 

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_NAME="ftep"
+BIN_NAME="ichsm"
 DEFAULT_LOCAL_DIR="$ROOT_DIR/build"
 DEFAULT_RELEASE_DIR="$ROOT_DIR/dist"
 DEFAULT_CACHE_DIR="$ROOT_DIR/.cache"
@@ -17,7 +17,7 @@ Usage:
   ./build.sh --all
 
 Default behavior:
-  Builds ftep for the current GOOS/GOARCH into ./build/.
+  Builds ichsm for the current GOOS/GOARCH into ./build/.
 
 Options:
   --release           Build the full release matrix:
@@ -173,7 +173,7 @@ build_one() {
 		CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
 			go build -trimpath \
 				-ldflags "-X main.version=${build_version}" \
-				-o "$outfile" ./cmd/ftep
+				-o "$outfile" ./cmd/ichsm
 	)
 
 	if [[ $release_mode -eq 1 ]]; then
