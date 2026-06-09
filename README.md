@@ -64,12 +64,22 @@ ftep search -a SAMN05276490 -c ALL
 
 Get runs for sample `SAMN05276490`:
 ```
-ftep search -a SAMN05276490 --s2r
+ftep search -a SAMN05276490 --level run
 ```
 
 Get metadata for study/project `PRJEB1787`:
 ```
 ftep search -a PRJEB1787
+```
+
+Get samples for study/project `PRJEB1787`:
+```
+ftep search -a PRJEB1787 --level sample
+```
+
+Get runs for study/project `PRJEB1787`:
+```
+ftep search -a PRJEB1787 --level run
 ```
 
 Get metadata for study accession `ERP001736`:
@@ -107,6 +117,7 @@ func main() {
 	results, err := client.Search(context.Background(), ftep.SearchOptions{
 		Accessions: []string{"SAMN05276490"},
 		Fields:     []string{"DEFAULT"},
+		Level:      ftep.AccessionTypeRun,
 	})
 	if err != nil {
 		panic(err)

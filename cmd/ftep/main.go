@@ -52,12 +52,12 @@ func newRootCommand(out io.Writer, errOut io.Writer) *cobra.Command {
 }
 
 type searchOptions struct {
-	accession   string
-	accFile     string
-	columns     string
-	outfmt      string
-	sampleToRun bool
-	debug       bool
+	accession string
+	accFile   string
+	columns   string
+	level     string
+	outfmt    string
+	debug     bool
 }
 
 func newSearchCommand() *cobra.Command {
@@ -81,7 +81,7 @@ func newSearchCommand() *cobra.Command {
 	flags.StringVar(&opts.accFile, "acc_file", "", "File of accessions to search for, one per line")
 	flags.StringVarP(&opts.columns, "columns", "c", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.columns, "fields", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
-	flags.BoolVar(&opts.sampleToRun, "s2r", false, "'sample to run': run data is reported for sample accessions")
+	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, or assembly. Default is the input accession level")
 	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json or tsv")
 	_ = flags.MarkHidden("acc_file")
 
@@ -102,8 +102,13 @@ func executeSearch(cmd *cobra.Command, opts searchOptions) error {
 	}
 
 	fields := strings.Split(opts.columns, ",")
+	level, err := parseSearchLevel(opts.level)
+	if err != nil {
+		return err
+	}
+
 	client := newClient()
-	results, err := searchAccessions(cmd.Context(), client, accessions, fields, opts.sampleToRun, opts.debug, cmd.ErrOrStderr())
+	results, err := searchAccessions(cmd.Context(), client, accessions, fields, level, opts.debug, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
@@ -113,6 +118,23 @@ func executeSearch(cmd *cobra.Command, opts searchOptions) error {
 	}
 
 	return writeTSV(cmd.OutOrStdout(), results, fields)
+}
+
+func parseSearchLevel(level string) (ftep.AccessionType, error) {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "":
+		return "", nil
+	case string(ftep.AccessionTypeStudy):
+		return ftep.AccessionTypeStudy, nil
+	case string(ftep.AccessionTypeSample):
+		return ftep.AccessionTypeSample, nil
+	case string(ftep.AccessionTypeRun):
+		return ftep.AccessionTypeRun, nil
+	case string(ftep.AccessionTypeAssembly):
+		return ftep.AccessionTypeAssembly, nil
+	default:
+		return "", fmt.Errorf("unsupported --level %q; expected study, sample, run, or assembly", level)
+	}
 }
 
 func newGetFieldsCommand() *cobra.Command {
@@ -150,7 +172,7 @@ func accessionsFromInputs(accession string, accFile string) ([]string, error) {
 	return ftep.ReadAccessionsFile(accFile)
 }
 
-func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, sampleToRun bool, debug bool, errOut io.Writer) ([]ftep.SearchResult, error) {
+func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, level ftep.AccessionType, debug bool, errOut io.Writer) ([]ftep.SearchResult, error) {
 	if len(accessions) == 0 {
 		return nil, errors.New("no accessions provided")
 	}
@@ -178,6 +200,9 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 			fmt.Fprintf(errOut, "%s\t%s\n", accession, accessionType)
 			return nil, fmt.Errorf("error getting result types from accessions")
 		}
+		if _, err := ftep.ResolveSearchLevel(accessionType, level); err != nil {
+			return nil, err
+		}
 
 		toSearch = append(toSearch, accessionSearch{input: accession, fixed: fixedAccession, typ: accessionType})
 	}
@@ -185,10 +210,14 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 	results := make([]ftep.SearchResult, 0, len(toSearch))
 	for _, accession := range toSearch {
 		if debug {
-			log.Printf("search for %s", accession.input)
+			if level == "" {
+				log.Printf("search for %s", accession.input)
+			} else {
+				log.Printf("search for %s at %s level", accession.input, level)
+			}
 		}
 
-		newFields, records, err := client.Query(ctx, accession.fixed, accession.typ, fields, sampleToRun)
+		resultType, newFields, records, err := client.Query(ctx, accession.fixed, accession.typ, fields, level)
 		if err != nil {
 			log.Printf("warning: error getting data for accession %s. Skipping", accession.input)
 			if debug {
@@ -204,7 +233,8 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 		results = append(results, ftep.SearchResult{
 			InputAccession: accession.input,
 			FixedAccession: accession.fixed,
-			Type:           accession.typ,
+			InputType:      accession.typ,
+			ResultType:     resultType,
 			Fields:         newFields,
 			Records:        records,
 		})

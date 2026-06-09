@@ -47,6 +47,41 @@ func TestRunSearchWritesTSV(t *testing.T) {
 	}
 }
 
+func TestRunSearchWithLevel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "read_run" {
+			t.Fatalf("result = %q, want read_run", got)
+		}
+		if got := query.Get("query"); got != "sample_accession=SAMN05276490 OR secondary_sample_accession=SAMN05276490" {
+			t.Fatalf("query = %q", got)
+		}
+		if got := query.Get("fields"); got != "study_accession,secondary_study_accession,sample_accession,secondary_sample_accession,run_accession,instrument_platform,library_layout,fastq_ftp" {
+			t.Fatalf("fields = %q", got)
+		}
+		_, _ = w.Write([]byte(`[{"run_accession":"ERR123456","fastq_ftp":"ftp.sra.ebi.ac.uk/file.fastq.gz"}]`))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "SAMN05276490", "--level", "run"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "input_accession\tstudy_accession\tsecondary_study_accession\tsample_accession\tsecondary_sample_accession\trun_accession\tinstrument_platform\tlibrary_layout\tfastq_ftp\n" +
+		"SAMN05276490\t.\t.\t.\t.\tERR123456\t.\t.\tftp.sra.ebi.ac.uk/file.fastq.gz\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunSearchWritesJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
