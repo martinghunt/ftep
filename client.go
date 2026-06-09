@@ -400,6 +400,11 @@ func supportsENA(accessionType AccessionType) bool {
 	}
 }
 
+// SupportsENA reports whether ichsm has an ENA search route for an accession type.
+func SupportsENA(accessionType AccessionType) bool {
+	return supportsENA(accessionType)
+}
+
 func supportsNCBI(accessionType AccessionType) bool {
 	switch accessionType {
 	case AccessionTypeAssembly, AccessionTypeContigSet, AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet, AccessionTypeSequence, AccessionTypeCoding:
@@ -407,6 +412,11 @@ func supportsNCBI(accessionType AccessionType) bool {
 	default:
 		return false
 	}
+}
+
+// SupportsNCBI reports whether ichsm has an NCBI search route for an accession type.
+func SupportsNCBI(accessionType AccessionType) bool {
+	return supportsNCBI(accessionType)
 }
 
 func (c *Client) resolvePrimaryStudyAccession(ctx context.Context, accession string) (string, error) {

@@ -44,6 +44,11 @@ For a cross-platform release build:
 
 ## Synopsis
 
+Identify an accession type, its normalized form, and supported metadata sources:
+```
+ichsm identify SAMN05276490
+```
+
 Get metadata for sample `SAMN05276490` in (default) TSV format:
 ```
 ichsm search -a SAMN05276490

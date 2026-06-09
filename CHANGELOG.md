@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add `ichsm identify` to classify accessions, show normalized forms, and report ENA/NCBI search support.
 - Add a weekly GitHub Actions live smoke test for the public ENA and NCBI endpoints.
 - Add ENA `sequence`, `coding`, `tsa_set`, and `tls_set` search support.
 - Add support for WGS/TSA/TLS short set IDs and component-shaped sequence accessions.
