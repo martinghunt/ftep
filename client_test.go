@@ -175,6 +175,25 @@ func TestGetAllowedFields(t *testing.T) {
 	}
 }
 
+func TestGetResultTypes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/results" {
+			t.Fatalf("path = %q, want /results", r.URL.Path)
+		}
+		_, _ = w.Write([]byte("resultId\tdescription\nread_run\tRaw reads\n"))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	text, err := client.GetResultTypes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "resultId\tdescription\nread_run\tRaw reads\n" {
+		t.Fatalf("text = %q", text)
+	}
+}
+
 func TestSearchRejectsMixedAccessionTypes(t *testing.T) {
 	client := &Client{}
 	_, err := client.Search(context.Background(), SearchOptions{

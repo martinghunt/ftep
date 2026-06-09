@@ -141,28 +141,98 @@ func newGetFieldsCommand() *cobra.Command {
 	var debug bool
 
 	cmd := &cobra.Command{
-		Use:   "get_fields data_type",
-		Short: "Get available fields for a given data type, such as read_run",
-		Args:  cobra.ExactArgs(1),
+		Use:   "get_fields [data_type]",
+		Short: "List ENA data types or fields for a given data type",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if debug {
-				log.Printf("getting fields for %s", args[0])
-			}
-
 			client := newClient()
-			text, err := client.GetAllowedFields(cmd.Context(), args[0])
+			var text string
+			var err error
+			if len(args) == 0 {
+				if debug {
+					log.Printf("getting available data types")
+				}
+				text, err = client.GetResultTypes(cmd.Context())
+				if err == nil {
+					text = appendFTEPSearchColumn(text)
+				}
+			} else {
+				if debug {
+					log.Printf("getting fields for %s", args[0])
+				}
+				text, err = client.GetAllowedFields(cmd.Context(), args[0])
+			}
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(cmd.OutOrStdout(), text)
-			if !strings.HasSuffix(text, "\n") {
-				fmt.Fprintln(cmd.OutOrStdout())
-			}
-			return nil
+			return writeTextWithTrailingNewline(cmd.OutOrStdout(), text)
 		},
 	}
 	cmd.Flags().BoolVar(&debug, "debug", false, "More verbose logging")
 	return cmd
+}
+
+func writeTextWithTrailingNewline(out io.Writer, text string) error {
+	fmt.Fprint(out, text)
+	if !strings.HasSuffix(text, "\n") {
+		fmt.Fprintln(out)
+	}
+	return nil
+}
+
+func appendFTEPSearchColumn(text string) string {
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		return text
+	}
+
+	type resultTypeRow struct {
+		resultType string
+		supported  bool
+		line       string
+	}
+
+	rows := make([]resultTypeRow, 0, len(lines)-1)
+	for _, line := range lines[1:] {
+		fields := strings.Split(line, "\t")
+		if len(fields) == 0 || fields[0] == "" {
+			continue
+		}
+		rows = append(rows, resultTypeRow{
+			resultType: fields[0],
+			supported:  ftepSearchSupportsResult(fields[0]),
+			line:       line,
+		})
+	}
+	sort.Slice(rows, func(i int, j int) bool {
+		if rows[i].supported != rows[j].supported {
+			return rows[i].supported
+		}
+		return rows[i].resultType < rows[j].resultType
+	})
+
+	out := make([]string, 0, len(lines))
+	out = append(out, lines[0]+"\tftep_search")
+	for _, row := range rows {
+		out = append(out, row.line+"\t"+yesNo(row.supported))
+	}
+	return strings.Join(out, "\n") + "\n"
+}
+
+func ftepSearchSupportsResult(resultType string) bool {
+	switch resultType {
+	case "assembly", "read_run", "sample", "study":
+		return true
+	default:
+		return false
+	}
+}
+
+func yesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
 
 func accessionsFromInputs(accession string, accFile string) ([]string, error) {

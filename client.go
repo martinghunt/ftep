@@ -260,6 +260,11 @@ func (c *Client) GetAllowedFields(ctx context.Context, dataType string) (string,
 	return c.requestText(ctx, "searchFields", params)
 }
 
+// GetResultTypes returns the ENA results response listing available data types.
+func (c *Client) GetResultTypes(ctx context.Context) (string, error) {
+	return c.requestText(ctx, "results", url.Values{})
+}
+
 // SortedRecordKeys returns record keys in deterministic order. It is useful
 // when ENA's ALL field preset is requested and the output columns come from the
 // returned JSON object.

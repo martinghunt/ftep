@@ -107,6 +107,17 @@ Print the ENA browser URL for run `SRR3675520`:
 ftep open SRR3675520 --print-url
 ```
 
+List available ENA data types and whether `ftep search` supports them, with
+supported types first:
+```
+ftep get_fields
+```
+
+List available fields for ENA data type `read_run`:
+```
+ftep get_fields read_run
+```
+
 Get metadata for study accession `ERP001736`:
 ```
 ftep search -a ERP001736
