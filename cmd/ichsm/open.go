@@ -31,7 +31,7 @@ func newOpenCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "open [accession]",
-		Short: "Open an accession in the ENA or NCBI browser",
+		Short: "Open an accession URL in your web browser",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeOpen(cmd, args, opts)
@@ -41,7 +41,7 @@ func newOpenCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVarP(&opts.accession, "accession", "a", "", "Accession to open")
 	flags.StringVar(&opts.source, "source", string(ichsm.SearchSourceAuto), "Browser source: auto, ena, or ncbi")
-	flags.BoolVar(&opts.printURL, "print-url", false, "Print the browser URL instead of opening it")
+	flags.BoolVar(&opts.printURL, "print-url", false, "Print the ENA or NCBI URL instead of opening your web browser")
 
 	return cmd
 }
