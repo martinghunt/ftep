@@ -210,6 +210,55 @@ func TestRunReadsWritesMD5(t *testing.T) {
 	}
 }
 
+func TestRunOpenPrintsURL(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "SRR3675520", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ebi.ac.uk/ena/browser/view/SRR3675520\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestRunOpenUsesBrowserOpener(t *testing.T) {
+	var openedURL string
+	withTestBrowserOpener(t, func(browserURL string) error {
+		openedURL = browserURL
+		return nil
+	})
+
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "-a", "GCA_000195955.2"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+
+	const wantURL = "https://www.ebi.ac.uk/ena/browser/view/GCA_000195955.2"
+	if openedURL != wantURL {
+		t.Fatalf("openedURL = %q, want %q", openedURL, wantURL)
+	}
+}
+
+func TestRunOpenRejectsInvalidAccession(t *testing.T) {
+	code, _ := captureStdout(t, func() int {
+		return run([]string{"open", "not-an-accession", "--print-url"})
+	})
+
+	if code == 0 {
+		t.Fatal("expected non-zero exit code")
+	}
+}
+
 func TestWriteReadsCurl(t *testing.T) {
 	files := []readFile{
 		{
@@ -267,6 +316,16 @@ func withTestClient(t *testing.T, server *httptest.Server) {
 	}
 	t.Cleanup(func() {
 		newClient = previous
+	})
+}
+
+func withTestBrowserOpener(t *testing.T, opener func(string) error) {
+	t.Helper()
+
+	previous := openBrowser
+	openBrowser = opener
+	t.Cleanup(func() {
+		openBrowser = previous
 	})
 }
 

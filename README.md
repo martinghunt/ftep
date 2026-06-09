@@ -97,6 +97,16 @@ Print MD5 checksum lines for those FASTQs:
 ftep reads -a SAMN05276490 --format md5
 ```
 
+Open sample `SAMN05276490` in the ENA browser:
+```
+ftep open SAMN05276490
+```
+
+Print the ENA browser URL for run `SRR3675520`:
+```
+ftep open SRR3675520 --print-url
+```
+
 Get metadata for study accession `ERP001736`:
 ```
 ftep search -a ERP001736
