@@ -62,6 +62,9 @@ type searchOptions struct {
 	accFile   string
 	columns   string
 	level     string
+	source    string
+	apiKey    string
+	email     string
 	outfmt    string
 	debug     bool
 }
@@ -87,7 +90,10 @@ func newSearchCommand() *cobra.Command {
 	flags.StringVar(&opts.accFile, "acc_file", "", "File of accessions to search for, one per line")
 	flags.StringVarP(&opts.columns, "columns", "c", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.columns, "fields", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
-	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, assembly, or wgs_set. Default is the input accession level")
+	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, assembly, sequence, coding, contig_set, wgs_set, tsa_set, or tls_set. Default is the input accession level")
+	flags.StringVar(&opts.source, "source", string(ftep.SearchSourceAuto), "Metadata source: auto, ena, or ncbi")
+	flags.StringVar(&opts.apiKey, "api-key", "", "NCBI API key; defaults to NCBI_API_KEY")
+	flags.StringVar(&opts.email, "email", "", "Email sent to NCBI; defaults to NCBI_EMAIL")
 	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json, table, or tsv")
 	_ = flags.MarkHidden("acc_file")
 
@@ -113,9 +119,22 @@ func executeSearch(cmd *cobra.Command, opts searchOptions) error {
 	if err != nil {
 		return err
 	}
+	source, err := parseSearchSource(opts.source)
+	if err != nil {
+		return err
+	}
 
 	client := newClient()
-	results, err := searchAccessions(cmd.Context(), client, accessions, fields, level, opts.debug, cmd.ErrOrStderr())
+	if opts.apiKey == "" {
+		opts.apiKey = os.Getenv("NCBI_API_KEY")
+	}
+	if opts.email == "" {
+		opts.email = os.Getenv("NCBI_EMAIL")
+	}
+	client.NCBIAPIKey = opts.apiKey
+	client.NCBIEmail = opts.email
+
+	results, err := searchAccessions(cmd.Context(), client, accessions, fields, level, source, opts.debug, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
@@ -160,10 +179,33 @@ func parseSearchLevel(level string) (ftep.AccessionType, error) {
 		return ftep.AccessionTypeRun, nil
 	case string(ftep.AccessionTypeAssembly):
 		return ftep.AccessionTypeAssembly, nil
+	case string(ftep.AccessionTypeSequence):
+		return ftep.AccessionTypeSequence, nil
+	case string(ftep.AccessionTypeCoding):
+		return ftep.AccessionTypeCoding, nil
+	case string(ftep.AccessionTypeContigSet):
+		return ftep.AccessionTypeContigSet, nil
 	case string(ftep.AccessionTypeWGSSet):
 		return ftep.AccessionTypeWGSSet, nil
+	case string(ftep.AccessionTypeTSASet):
+		return ftep.AccessionTypeTSASet, nil
+	case string(ftep.AccessionTypeTLSSet):
+		return ftep.AccessionTypeTLSSet, nil
 	default:
-		return "", fmt.Errorf("unsupported --level %q; expected study, sample, run, assembly, or wgs_set", level)
+		return "", fmt.Errorf("unsupported --level %q; expected study, sample, run, assembly, sequence, coding, contig_set, wgs_set, tsa_set, or tls_set", level)
+	}
+}
+
+func parseSearchSource(source string) (ftep.SearchSource, error) {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "", string(ftep.SearchSourceAuto):
+		return ftep.SearchSourceAuto, nil
+	case string(ftep.SearchSourceENA):
+		return ftep.SearchSourceENA, nil
+	case string(ftep.SearchSourceNCBI):
+		return ftep.SearchSourceNCBI, nil
+	default:
+		return "", fmt.Errorf("unsupported --source %q; expected auto, ena, or ncbi", source)
 	}
 }
 
@@ -260,7 +302,7 @@ func appendFTEPSearchColumn(text string) string {
 
 func ftepSearchSupportsResult(resultType string) bool {
 	switch resultType {
-	case "assembly", "read_run", "sample", "study", "wgs_set":
+	case "assembly", "coding", "read_run", "sample", "sequence", "study", "tls_set", "tsa_set", "wgs_set":
 		return true
 	default:
 		return false
@@ -281,7 +323,7 @@ func accessionsFromInputs(accession string, accFile string) ([]string, error) {
 	return ftep.ReadAccessionsFile(accFile)
 }
 
-func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, level ftep.AccessionType, debug bool, errOut io.Writer) ([]ftep.SearchResult, error) {
+func searchAccessions(ctx context.Context, client *ftep.Client, accessions []string, fields []string, level ftep.AccessionType, source ftep.SearchSource, debug bool, errOut io.Writer) ([]ftep.SearchResult, error) {
 	if len(accessions) == 0 {
 		return nil, errors.New("no accessions provided")
 	}
@@ -326,7 +368,7 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 			}
 		}
 
-		resultType, newFields, records, err := client.Query(ctx, accession.fixed, accession.typ, fields, level)
+		resultSource, resultType, newFields, records, err := client.QueryWithSource(ctx, accession.input, accession.fixed, accession.typ, fields, level, source)
 		if err != nil {
 			log.Printf("warning: error getting data for accession %s. Skipping", accession.input)
 			if debug {
@@ -344,6 +386,7 @@ func searchAccessions(ctx context.Context, client *ftep.Client, accessions []str
 			FixedAccession: accession.fixed,
 			InputType:      accession.typ,
 			ResultType:     resultType,
+			Source:         resultSource,
 			Fields:         newFields,
 			Records:        records,
 		})

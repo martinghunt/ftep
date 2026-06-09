@@ -10,6 +10,10 @@ type searchEndpoint struct {
 var urlSearchData = map[AccessionType]searchEndpoint{
 	AccessionTypeAssembly:   {mainType: "search", result: "assembly"},
 	AccessionTypeWGSSet:     {mainType: "search", result: "wgs_set"},
+	AccessionTypeTSASet:     {mainType: "search", result: "tsa_set"},
+	AccessionTypeTLSSet:     {mainType: "search", result: "tls_set"},
+	AccessionTypeSequence:   {mainType: "search", result: "sequence"},
+	AccessionTypeCoding:     {mainType: "search", result: "coding"},
 	AccessionTypeStudy:      {mainType: "search", result: "study"},
 	AccessionTypeSample:     {mainType: "search", result: "sample"},
 	AccessionTypeRun:        {mainType: "search", result: "read_run"},
@@ -21,6 +25,29 @@ var assemblyDefault = append(copyStrings(assemblySmall), "scientific_name", "tax
 
 var wgsSetSmall = []string{"accession", "wgs_set", "assembly_accession", "sample_accession", "run_accession", "sequence_version"}
 var wgsSetDefault = append(copyStrings(wgsSetSmall), "scientific_name", "tax_id")
+
+var contigSetSmall = []string{"accession", "sample_accession", "sequence_version"}
+var contigSetDefault = append(copyStrings(contigSetSmall), "description", "scientific_name", "tax_id", "study_accession")
+
+var sequenceSmall = []string{"accession", "sequence_version"}
+var sequenceDefault = append(copyStrings(sequenceSmall), "description", "scientific_name", "tax_id")
+var sequenceBig = append(copyStrings(sequenceDefault),
+	"sample_accession",
+	"study_accession",
+	"assembly_accession",
+	"base_count",
+	"mol_type",
+)
+
+var codingSmall = []string{"accession", "protein_id", "parent_accession", "sequence_version"}
+var codingDefault = append(copyStrings(codingSmall), "description", "product", "scientific_name", "tax_id")
+var codingBig = append(copyStrings(codingDefault),
+	"sample_accession",
+	"study_accession",
+	"gene",
+	"locus_tag",
+	"transl_table",
+)
 
 var studySmall = []string{
 	"study_accession",
@@ -77,10 +104,35 @@ var fieldPresets = map[AccessionType]map[string][]string{
 		"DEFAULT": assemblyDefault,
 		"BIG":     assemblyDefault,
 	},
+	AccessionTypeContigSet: {
+		"SMALL":   contigSetSmall,
+		"DEFAULT": contigSetDefault,
+		"BIG":     contigSetDefault,
+	},
 	AccessionTypeWGSSet: {
 		"SMALL":   wgsSetSmall,
 		"DEFAULT": wgsSetDefault,
 		"BIG":     wgsSetDefault,
+	},
+	AccessionTypeTSASet: {
+		"SMALL":   contigSetSmall,
+		"DEFAULT": contigSetDefault,
+		"BIG":     contigSetDefault,
+	},
+	AccessionTypeTLSSet: {
+		"SMALL":   contigSetSmall,
+		"DEFAULT": contigSetDefault,
+		"BIG":     contigSetDefault,
+	},
+	AccessionTypeSequence: {
+		"SMALL":   sequenceSmall,
+		"DEFAULT": sequenceDefault,
+		"BIG":     sequenceBig,
+	},
+	AccessionTypeCoding: {
+		"SMALL":   codingSmall,
+		"DEFAULT": codingDefault,
+		"BIG":     codingBig,
 	},
 	AccessionTypeStudy: {
 		"SMALL":   studySmall,

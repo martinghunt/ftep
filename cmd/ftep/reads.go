@@ -93,7 +93,7 @@ func executeReads(cmd *cobra.Command, opts readsOptions) error {
 	}
 
 	client := newClient()
-	results, err := searchAccessions(cmd.Context(), client, accessions, readsFields, ftep.AccessionTypeRun, opts.debug, cmd.ErrOrStderr())
+	results, err := searchAccessions(cmd.Context(), client, accessions, readsFields, ftep.AccessionTypeRun, ftep.SearchSourceENA, opts.debug, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}

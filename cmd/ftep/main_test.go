@@ -183,6 +183,43 @@ func TestRunSearchWGSSetWritesTSV(t *testing.T) {
 	}
 }
 
+func TestRunSearchFallsBackToNCBIAssembly(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			if got := r.URL.Query().Get("result"); got != "assembly" {
+				t.Fatalf("ENA result = %q, want assembly", got)
+			}
+			_, _ = w.Write([]byte(`[]`))
+		case "/esearch.fcgi":
+			if got := r.URL.Query().Get("term"); got != "GCF_000001405.40[Assembly Accession]" {
+				t.Fatalf("NCBI term = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"esearchresult":{"idlist":["11968211"]}}`))
+		case "/esummary.fcgi":
+			_, _ = w.Write([]byte(`{"result":{"uids":["11968211"],"11968211":{"assemblyaccession":"GCF_000001405.40","speciesname":"Homo sapiens","taxid":9606,"biosampleaccn":"SAMN1"}}}`))
+		default:
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "GCF_000001405.40"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "input_accession\taccession\tsample_accession\trun_accession\tversion\tscientific_name\ttax_id\n" +
+		"GCF_000001405.40\tGCF_000001405\tSAMN1\t.\t40\tHomo sapiens\t9606\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunReadsWritesManifest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
@@ -363,6 +400,76 @@ func TestRunOpenRejectsInvalidAccession(t *testing.T) {
 	}
 }
 
+func TestRunOpenPrintsNCBIProteinURL(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "WP_002248791.1", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ncbi.nlm.nih.gov/protein/WP_002248791.1\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestRunOpenPrintsNCBIAssemblyURL(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "GCF_000001405.40", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000001405.40/\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestRunOpenCanForceNCBIForSharedProteinAccession(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "AAA98665.1", "--source", "ncbi", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ncbi.nlm.nih.gov/protein/AAA98665.1\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestRunOpenCanForceNCBIForSharedNucleotideAccession(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "U49845.1", "--source", "ncbi", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ncbi.nlm.nih.gov/nuccore/U49845.1\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestRunOpenRejectsNCBIOnlyAccessionWithENASource(t *testing.T) {
+	code, _ := captureStdout(t, func() int {
+		return run([]string{"open", "WP_002248791.1", "--source", "ena", "--print-url"})
+	})
+
+	if code == 0 {
+		t.Fatal("expected non-zero exit code")
+	}
+}
+
 func TestRunGetFieldsListsDataTypes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/results" {
@@ -384,9 +491,9 @@ func TestRunGetFieldsListsDataTypes(t *testing.T) {
 	const want = "resultId\tdescription\tprimaryAccessionType\tftep_search\n" +
 		"read_run\tRaw reads\trun_accession\tyes\n" +
 		"sample\tSamples\tsample_accession\tyes\n" +
+		"tls_set\tTargeted locus study contig sets\taccession\tyes\n" +
 		"wgs_set\tGenome assembly contig set (WGS)\taccession\tyes\n" +
-		"analysis\tAnalyses\tanalysis_accession\tno\n" +
-		"tls_set\tTargeted locus study contig sets\taccession\tno\n"
+		"analysis\tAnalyses\tanalysis_accession\tno\n"
 	if stdout != want {
 		t.Fatalf("stdout = %q, want %q", stdout, want)
 	}
@@ -513,8 +620,9 @@ func withTestClient(t *testing.T, server *httptest.Server) {
 	previous := newClient
 	newClient = func() *ftep.Client {
 		return &ftep.Client{
-			BaseURL:    server.URL,
-			HTTPClient: server.Client(),
+			BaseURL:     server.URL,
+			NCBIBaseURL: server.URL,
+			HTTPClient:  server.Client(),
 		}
 	}
 	t.Cleanup(func() {

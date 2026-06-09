@@ -1,8 +1,11 @@
 # ftep
 
-Finding things in the ENA portal.
+Finding sequence metadata from ENA and NCBI.
 
-Currently supported: run, experiment, sample, study/project, assembly, and WGS master accessions.
+Currently supported: run, experiment, sample, study/project, assembly, INSDC sequence/coding,
+WGS/TSA/TLS contig set, and selected NCBI/RefSeq accessions. `ftep search`
+uses `--source auto` by default: it queries ENA first where applicable, then
+falls back to NCBI for accessions such as `GCF_`, `NC_`, and `WP_`.
 
 This repository was developed with substantial coding assistance from
 [OpenAI Codex](https://openai.com/codex), which helped with implementation,
@@ -117,6 +120,21 @@ Print the ENA browser URL for run `SRR3675520`:
 ftep open SRR3675520 --print-url
 ```
 
+Print the NCBI browser URL for a RefSeq assembly:
+```
+ftep open GCF_000001405.40 --print-url
+```
+
+Print the NCBI protein URL for a RefSeq protein:
+```
+ftep open WP_002248791.1 --print-url
+```
+
+Force NCBI for an accession that is also available from ENA:
+```
+ftep open U49845.1 --source ncbi --print-url
+```
+
 List available ENA data types and whether `ftep search` supports them, with
 supported types first:
 ```
@@ -148,10 +166,44 @@ Get metadata for WGS master accession `AGQU00000000.1`:
 ftep search -a AGQU00000000.1
 ```
 
+Get metadata for TSA master accession `GHIQ00000000.1`:
+```
+ftep search -a GHIQ00000000.1
+```
+
+Get metadata for INSDC nucleotide sequence `U49845.1`:
+```
+ftep search -a U49845.1
+```
+
+Get metadata for INSDC coding/protein accession `AAA98665.1`:
+```
+ftep search -a AAA98665.1
+```
+
+Get metadata for an NCBI RefSeq assembly, falling back to NCBI automatically:
+```
+ftep search -a GCF_000001405.40
+```
+
+Get metadata for an NCBI protein accession:
+```
+ftep search -a WP_002248791.1
+```
+
+Force a metadata source when needed:
+```
+ftep search -a U49845.1 --source ena
+ftep search -a WP_002248791.1 --source ncbi
+```
+
+When NCBI is queried, set `NCBI_API_KEY` and `NCBI_EMAIL`, or pass
+`--api-key` and `--email`, to send those values with NCBI E-utilities requests.
+
 
 ## Go library
 
-Import the module and use the ENA client directly:
+Import the module and use the client directly:
 
 ```go
 package main
@@ -169,6 +221,7 @@ func main() {
 		Accessions: []string{"SAMN05276490"},
 		Fields:     []string{"DEFAULT"},
 		Level:      ftep.AccessionTypeRun,
+		Source:     ftep.SearchSourceAuto,
 	})
 	if err != nil {
 		panic(err)

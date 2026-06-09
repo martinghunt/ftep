@@ -16,10 +16,23 @@ import (
 // Record is one metadata record returned by the ENA portal.
 type Record map[string]any
 
+// SearchSource is the metadata provider to query.
+type SearchSource string
+
+const (
+	SearchSourceAuto SearchSource = "auto"
+	SearchSourceENA  SearchSource = "ena"
+	SearchSourceNCBI SearchSource = "ncbi"
+)
+
 // Client queries the ENA portal API.
 type Client struct {
-	BaseURL    string
-	HTTPClient *http.Client
+	BaseURL     string
+	NCBIBaseURL string
+	NCBIAPIKey  string
+	NCBIEmail   string
+	NCBITool    string
+	HTTPClient  *http.Client
 }
 
 // SearchOptions configures a multi-accession search.
@@ -27,6 +40,7 @@ type SearchOptions struct {
 	Accessions []string
 	Fields     []string
 	Level      AccessionType
+	Source     SearchSource
 }
 
 // SearchResult contains records for one input accession.
@@ -35,6 +49,7 @@ type SearchResult struct {
 	FixedAccession string        `json:"fixed_accession"`
 	InputType      AccessionType `json:"input_type"`
 	ResultType     AccessionType `json:"result_type"`
+	Source         SearchSource  `json:"source"`
 	Fields         []string      `json:"fields"`
 	Records        []Record      `json:"records"`
 }
@@ -58,11 +73,35 @@ func SearchKeyValue(queryType AccessionType, resultType AccessionType, accession
 			return "", "", unsupportedSearchLevel(queryType, resultType)
 		}
 		return "query", "accession=" + accession, nil
+	case AccessionTypeContigSet:
+		switch resultType {
+		case AccessionTypeWGSSet:
+			return "query", "wgs_set=" + accession, nil
+		case AccessionTypeTSASet, AccessionTypeTLSSet:
+			return "query", "accession=" + contigSetMasterAccession(accession), nil
+		default:
+			return "", "", unsupportedSearchLevel(queryType, resultType)
+		}
 	case AccessionTypeWGSSet:
 		if resultType != AccessionTypeWGSSet {
 			return "", "", unsupportedSearchLevel(queryType, resultType)
 		}
 		return "query", "wgs_set=" + accession, nil
+	case AccessionTypeTSASet, AccessionTypeTLSSet:
+		if resultType != queryType {
+			return "", "", unsupportedSearchLevel(queryType, resultType)
+		}
+		return "query", "accession=" + contigSetMasterAccession(accession), nil
+	case AccessionTypeSequence:
+		if resultType != AccessionTypeSequence {
+			return "", "", unsupportedSearchLevel(queryType, resultType)
+		}
+		return "query", "accession=" + accession, nil
+	case AccessionTypeCoding:
+		if resultType != AccessionTypeCoding {
+			return "", "", unsupportedSearchLevel(queryType, resultType)
+		}
+		return "query", "accession=" + accession, nil
 	case AccessionTypeStudy:
 		switch resultType {
 		case AccessionTypeStudy:
@@ -115,9 +154,50 @@ func ResolveFields(accessionType AccessionType, fields []string) ([]string, erro
 
 // Query searches ENA for one normalized accession at a requested output level.
 func (c *Client) Query(ctx context.Context, accession string, accessionType AccessionType, fields []string, level AccessionType) (AccessionType, []string, []Record, error) {
+	return c.queryENA(ctx, accession, accessionType, fields, level)
+}
+
+// QueryWithSource searches for one accession using the requested source. Auto
+// source queries ENA first, then falls back to NCBI when ENA returns no rows and
+// the accession has an NCBI route.
+func (c *Client) QueryWithSource(ctx context.Context, inputAccession string, accession string, accessionType AccessionType, fields []string, level AccessionType, source SearchSource) (SearchSource, AccessionType, []string, []Record, error) {
+	source, err := normalizeSearchSource(source)
+	if err != nil {
+		return "", "", nil, nil, err
+	}
+
+	switch source {
+	case SearchSourceENA:
+		resultType, resolvedFields, records, err := c.queryENA(ctx, accession, accessionType, fields, level)
+		return SearchSourceENA, resultType, resolvedFields, records, err
+	case SearchSourceNCBI:
+		resultType, resolvedFields, records, err := c.queryNCBI(ctx, inputAccession, accession, accessionType, fields, level)
+		return SearchSourceNCBI, resultType, resolvedFields, records, err
+	case SearchSourceAuto:
+		resultType, resolvedFields, records, err := c.queryENA(ctx, accession, accessionType, fields, level)
+		if err == nil && len(records) > 0 {
+			return SearchSourceENA, resultType, resolvedFields, records, nil
+		}
+		if !supportsNCBI(accessionType) {
+			return SearchSourceENA, resultType, resolvedFields, records, err
+		}
+		if err != nil && supportsENA(accessionType) {
+			return SearchSourceENA, resultType, resolvedFields, records, err
+		}
+		resultType, resolvedFields, records, err = c.queryNCBI(ctx, inputAccession, accession, accessionType, fields, level)
+		return SearchSourceNCBI, resultType, resolvedFields, records, err
+	default:
+		return "", "", nil, nil, fmt.Errorf("unsupported source %q", source)
+	}
+}
+
+func (c *Client) queryENA(ctx context.Context, accession string, accessionType AccessionType, fields []string, level AccessionType) (AccessionType, []string, []Record, error) {
 	resultType, err := ResolveSearchLevel(accessionType, level)
 	if err != nil {
 		return "", nil, nil, err
+	}
+	if resultType == AccessionTypeContigSet {
+		return c.queryENAContigSet(ctx, accession, accessionType, fields)
 	}
 
 	if accessionType == AccessionTypeStudy && resultType != AccessionTypeStudy {
@@ -152,8 +232,56 @@ func (c *Client) Query(ctx context.Context, accession string, accessionType Acce
 	if err != nil {
 		return "", nil, nil, err
 	}
+	addSourceToRecords(results, SearchSourceENA)
 
 	return resultType, resolvedFields, results, nil
+}
+
+func (c *Client) queryENAContigSet(ctx context.Context, accession string, accessionType AccessionType, fields []string) (AccessionType, []string, []Record, error) {
+	candidates := []AccessionType{AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet}
+	var lastResultType AccessionType
+	var lastFields []string
+	var lastErr error
+	for _, resultType := range candidates {
+		searchKey, searchValue, err := SearchKeyValue(accessionType, resultType, accession)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		endpoint := urlSearchData[resultType]
+		resolvedFields, err := ResolveFields(resultType, fields)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		params := url.Values{}
+		params.Set("result", endpoint.result)
+		params.Set(searchKey, searchValue)
+		params.Set("format", "json")
+		params.Set("fields", strings.Join(resolvedFields, ","))
+
+		records, err := c.requestJSON(ctx, endpoint.mainType, params)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		lastResultType = resultType
+		lastFields = resolvedFields
+		if len(records) > 0 {
+			addSourceToRecords(records, SearchSourceENA)
+			return resultType, resolvedFields, records, nil
+		}
+	}
+
+	if lastErr != nil {
+		return "", nil, nil, lastErr
+	}
+	if lastResultType == "" {
+		lastResultType = AccessionTypeContigSet
+		lastFields, _ = ResolveFields(AccessionTypeContigSet, fields)
+	}
+	return lastResultType, lastFields, nil, nil
 }
 
 // Search identifies and queries a set of accessions. As in the original CLI,
@@ -186,7 +314,7 @@ func (c *Client) Search(ctx context.Context, opts SearchOptions) ([]SearchResult
 
 	results := make([]SearchResult, 0, len(toSearch))
 	for _, accession := range toSearch {
-		resultType, fields, records, err := c.Query(ctx, accession.fixed, accession.typ, opts.Fields, opts.Level)
+		source, resultType, fields, records, err := c.QueryWithSource(ctx, accession.input, accession.fixed, accession.typ, opts.Fields, opts.Level, opts.Source)
 		if err != nil {
 			return nil, err
 		}
@@ -195,6 +323,7 @@ func (c *Client) Search(ctx context.Context, opts SearchOptions) ([]SearchResult
 			FixedAccession: accession.fixed,
 			InputType:      accession.typ,
 			ResultType:     resultType,
+			Source:         source,
 			Fields:         fields,
 			Records:        records,
 		})
@@ -210,17 +339,27 @@ func ResolveSearchLevel(inputType AccessionType, level AccessionType) (Accession
 		if inputType == AccessionTypeExperiment {
 			return AccessionTypeRun, nil
 		}
+		if inputType == AccessionTypeWGSSet || inputType == AccessionTypeTSASet || inputType == AccessionTypeTLSSet {
+			return inputType, nil
+		}
 		return inputType, nil
 	}
 
-	if inputType == AccessionTypeWGSSet && level == AccessionTypeAssembly {
-		return AccessionTypeWGSSet, nil
+	if inputType == AccessionTypeContigSet && level == AccessionTypeAssembly {
+		return AccessionTypeContigSet, nil
 	}
 
 	switch level {
-	case AccessionTypeAssembly, AccessionTypeWGSSet, AccessionTypeStudy, AccessionTypeSample, AccessionTypeRun:
+	case AccessionTypeAssembly, AccessionTypeContigSet, AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet, AccessionTypeSequence, AccessionTypeCoding, AccessionTypeStudy, AccessionTypeSample, AccessionTypeRun:
 	default:
-		return "", fmt.Errorf("unsupported search level %q; expected study, sample, run, assembly, or wgs_set", level)
+		return "", fmt.Errorf("unsupported search level %q; expected study, sample, run, assembly, sequence, coding, contig_set, wgs_set, tsa_set, or tls_set", level)
+	}
+
+	if inputType == AccessionTypeContigSet {
+		switch level {
+		case AccessionTypeContigSet, AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet:
+			return level, nil
+		}
 	}
 
 	if _, _, err := SearchKeyValue(inputType, level, ""); err != nil {
@@ -231,6 +370,43 @@ func ResolveSearchLevel(inputType AccessionType, level AccessionType) (Accession
 
 func unsupportedSearchLevel(inputType AccessionType, level AccessionType) error {
 	return fmt.Errorf("cannot search %s accessions at %s level", inputType, level)
+}
+
+func normalizeSearchSource(source SearchSource) (SearchSource, error) {
+	switch SearchSource(strings.ToLower(strings.TrimSpace(string(source)))) {
+	case "", SearchSourceAuto:
+		return SearchSourceAuto, nil
+	case SearchSourceENA:
+		return SearchSourceENA, nil
+	case SearchSourceNCBI:
+		return SearchSourceNCBI, nil
+	default:
+		return "", fmt.Errorf("unsupported source %q; expected auto, ena, or ncbi", source)
+	}
+}
+
+func addSourceToRecords(records []Record, source SearchSource) {
+	for _, record := range records {
+		record["source"] = string(source)
+	}
+}
+
+func supportsENA(accessionType AccessionType) bool {
+	switch accessionType {
+	case AccessionTypeAssembly, AccessionTypeContigSet, AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet, AccessionTypeSequence, AccessionTypeCoding, AccessionTypeStudy, AccessionTypeSample, AccessionTypeRun, AccessionTypeExperiment:
+		return true
+	default:
+		return false
+	}
+}
+
+func supportsNCBI(accessionType AccessionType) bool {
+	switch accessionType {
+	case AccessionTypeAssembly, AccessionTypeContigSet, AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet, AccessionTypeSequence, AccessionTypeCoding:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Client) resolvePrimaryStudyAccession(ctx context.Context, accession string) (string, error) {
@@ -319,7 +495,15 @@ func (c *Client) requestText(ctx context.Context, path string, params url.Values
 }
 
 func (c *Client) request(ctx context.Context, path string, params url.Values) ([]byte, error) {
-	requestURL, err := c.requestURL(path, params)
+	baseURL := BasePortalURL
+	if c != nil && c.BaseURL != "" {
+		baseURL = c.BaseURL
+	}
+	return c.requestWithBase(ctx, baseURL, path, params)
+}
+
+func (c *Client) requestWithBase(ctx context.Context, baseURL string, path string, params url.Values) ([]byte, error) {
+	requestURL, err := requestURL(baseURL, path, params)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +536,10 @@ func (c *Client) requestURL(path string, params url.Values) (string, error) {
 	if c != nil && c.BaseURL != "" {
 		baseURL = c.BaseURL
 	}
+	return requestURL(baseURL, path, params)
+}
 
+func requestURL(baseURL string, path string, params url.Values) (string, error) {
 	parsed, err := url.Parse(strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(path, "/"))
 	if err != nil {
 		return "", err

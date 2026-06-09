@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add ENA `sequence`, `coding`, `tsa_set`, and `tls_set` search support.
+- Add support for WGS/TSA/TLS short set IDs and component-shaped sequence accessions.
+- Add `ftep search --source auto|ena|ncbi`, defaulting to ENA first with NCBI fallback.
+- Add `ftep open --source auto|ena|ncbi` with NCBI browser URLs for NCBI-only or forced NCBI accessions.
+- Add NCBI E-utilities metadata fallback for `GCF_`, RefSeq nucleotide, and RefSeq protein accessions.
+- Add `ftep search --api-key` and `--email`, defaulting to `NCBI_API_KEY` and `NCBI_EMAIL`, for NCBI requests.
 - Add support for WGS master accessions such as `AGQU00000000.1`.
 - Add support for ENA study/project accessions, including `PRJEB`, `PRJDB`, `PRJNA`, `ERP`, `DRP`, and `SRP` accessions.
 - Add `ftep search --level` to choose study, sample, run, or assembly output level where supported by the input accession type.

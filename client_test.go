@@ -113,7 +113,7 @@ func TestQueryWGSSet(t *testing.T) {
 	defer server.Close()
 
 	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
-	resultType, fields, records, err := client.Query(context.Background(), "AGQU01", AccessionTypeWGSSet, []string{"DEFAULT"}, AccessionTypeAssembly)
+	resultType, fields, records, err := client.Query(context.Background(), "AGQU01", AccessionTypeContigSet, []string{"DEFAULT"}, AccessionTypeAssembly)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,6 +128,166 @@ func TestQueryWGSSet(t *testing.T) {
 	}
 	if records[0]["assembly_accession"] != "GCA_000231155" {
 		t.Fatalf("assembly_accession = %q", records[0]["assembly_accession"])
+	}
+}
+
+func TestQuerySequence(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "sequence" {
+			t.Fatalf("result = %q, want sequence", got)
+		}
+		if got := query.Get("query"); got != "accession=U49845" {
+			t.Fatalf("query = %q", got)
+		}
+		if got := query.Get("fields"); got != "accession,sequence_version,description,scientific_name,tax_id" {
+			t.Fatalf("fields = %q", got)
+		}
+		_, _ = w.Write([]byte(`[{"accession":"U49845","sequence_version":"1","description":"test sequence","scientific_name":"Saccharomyces cerevisiae","tax_id":"4932"}]`))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	resultType, fields, records, err := client.Query(context.Background(), "U49845", AccessionTypeSequence, []string{"DEFAULT"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resultType != AccessionTypeSequence {
+		t.Fatalf("resultType = %q, want %q", resultType, AccessionTypeSequence)
+	}
+	if !reflect.DeepEqual(fields, sequenceDefault) {
+		t.Fatalf("fields = %#v, want %#v", fields, sequenceDefault)
+	}
+	if records[0]["source"] != "ena" {
+		t.Fatalf("source = %q, want ena", records[0]["source"])
+	}
+}
+
+func TestQueryCoding(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "coding" {
+			t.Fatalf("result = %q, want coding", got)
+		}
+		if got := query.Get("query"); got != "accession=AAA98665" {
+			t.Fatalf("query = %q", got)
+		}
+		if got := query.Get("fields"); got != "accession,protein_id,parent_accession,sequence_version,description,product,scientific_name,tax_id" {
+			t.Fatalf("fields = %q", got)
+		}
+		_, _ = w.Write([]byte(`[{"accession":"AAA98665","protein_id":"AAA98665.1","parent_accession":"U49845","sequence_version":"1","description":"test protein","product":"TCP1-beta"}]`))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	resultType, fields, records, err := client.Query(context.Background(), "AAA98665", AccessionTypeCoding, []string{"DEFAULT"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resultType != AccessionTypeCoding {
+		t.Fatalf("resultType = %q, want %q", resultType, AccessionTypeCoding)
+	}
+	if !reflect.DeepEqual(fields, codingDefault) {
+		t.Fatalf("fields = %#v, want %#v", fields, codingDefault)
+	}
+	if records[0]["protein_id"] != "AAA98665.1" {
+		t.Fatalf("protein_id = %q", records[0]["protein_id"])
+	}
+}
+
+func TestQueryContigSetFallsBackToTSASet(t *testing.T) {
+	var sawWGS bool
+	var sawTSA bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		switch query.Get("result") {
+		case "wgs_set":
+			sawWGS = true
+			if got := query.Get("query"); got != "wgs_set=GHIQ01" {
+				t.Fatalf("wgs query = %q", got)
+			}
+			_, _ = w.Write([]byte(`[]`))
+		case "tsa_set":
+			sawTSA = true
+			if got := query.Get("query"); got != "accession=GHIQ01000000" {
+				t.Fatalf("tsa query = %q", got)
+			}
+			if got := query.Get("fields"); got != "accession,sample_accession,sequence_version,description,scientific_name,tax_id,study_accession" {
+				t.Fatalf("tsa fields = %q", got)
+			}
+			_, _ = w.Write([]byte(`[{"accession":"GHIQ01000000","sequence_version":"1","description":"test tsa"}]`))
+		default:
+			t.Fatalf("result = %q", query.Get("result"))
+		}
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	resultType, fields, records, err := client.Query(context.Background(), "GHIQ01", AccessionTypeContigSet, []string{"DEFAULT"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawWGS || !sawTSA {
+		t.Fatalf("sawWGS=%v sawTSA=%v", sawWGS, sawTSA)
+	}
+	if resultType != AccessionTypeTSASet {
+		t.Fatalf("resultType = %q, want %q", resultType, AccessionTypeTSASet)
+	}
+	if !reflect.DeepEqual(fields, contigSetDefault) {
+		t.Fatalf("fields = %#v, want %#v", fields, contigSetDefault)
+	}
+	if records[0]["accession"] != "GHIQ01000000" {
+		t.Fatalf("accession = %q", records[0]["accession"])
+	}
+}
+
+func TestQueryWithSourceAutoFallsBackToNCBIAssembly(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			if got := r.URL.Query().Get("result"); got != "assembly" {
+				t.Fatalf("ENA result = %q, want assembly", got)
+			}
+			_, _ = w.Write([]byte(`[]`))
+		case "/esearch.fcgi":
+			query := r.URL.Query()
+			if got := query.Get("db"); got != "assembly" {
+				t.Fatalf("NCBI db = %q, want assembly", got)
+			}
+			if got := query.Get("term"); got != "GCF_000001405.40[Assembly Accession]" {
+				t.Fatalf("NCBI term = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"esearchresult":{"idlist":["11968211"]}}`))
+		case "/esummary.fcgi":
+			if got := r.URL.Query().Get("id"); got != "11968211" {
+				t.Fatalf("NCBI id = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"result":{"uids":["11968211"],"11968211":{"assemblyaccession":"GCF_000001405.40","speciesname":"Homo sapiens","taxid":9606,"biosampleaccn":"SAMN1","rs_bioprojects":[{"bioprojectaccn":"PRJNA168"}]}}}`))
+		default:
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", NCBIBaseURL: server.URL + "/", HTTPClient: server.Client()}
+	source, resultType, fields, records, err := client.QueryWithSource(context.Background(), "GCF_000001405.40", "GCF_000001405", AccessionTypeAssembly, []string{"DEFAULT"}, "", SearchSourceAuto)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source != SearchSourceNCBI {
+		t.Fatalf("source = %q, want %q", source, SearchSourceNCBI)
+	}
+	if resultType != AccessionTypeAssembly {
+		t.Fatalf("resultType = %q, want %q", resultType, AccessionTypeAssembly)
+	}
+	if !reflect.DeepEqual(fields, assemblyDefault) {
+		t.Fatalf("fields = %#v, want %#v", fields, assemblyDefault)
+	}
+	if records[0]["accession"] != "GCF_000001405" || records[0]["version"] != "40" {
+		t.Fatalf("record accession/version = %q/%q", records[0]["accession"], records[0]["version"])
+	}
+	if records[0]["source"] != "ncbi" {
+		t.Fatalf("source field = %q", records[0]["source"])
 	}
 }
 

@@ -11,12 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const enaBrowserViewBaseURL = "https://www.ebi.ac.uk/ena/browser/view/"
+const (
+	enaBrowserViewBaseURL      = "https://www.ebi.ac.uk/ena/browser/view/"
+	ncbiAssemblyBrowserBaseURL = "https://www.ncbi.nlm.nih.gov/datasets/genome/"
+	ncbiNuccoreBrowserBaseURL  = "https://www.ncbi.nlm.nih.gov/nuccore/"
+	ncbiProteinBrowserBaseURL  = "https://www.ncbi.nlm.nih.gov/protein/"
+)
 
 var openBrowser = openURLInBrowser
 
 type openOptions struct {
 	accession string
+	source    string
 	printURL  bool
 }
 
@@ -25,7 +31,7 @@ func newOpenCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "open [accession]",
-		Short: "Open an accession in the ENA browser",
+		Short: "Open an accession in the ENA or NCBI browser",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeOpen(cmd, args, opts)
@@ -34,7 +40,8 @@ func newOpenCommand() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.StringVarP(&opts.accession, "accession", "a", "", "Accession to open")
-	flags.BoolVar(&opts.printURL, "print-url", false, "Print the ENA browser URL instead of opening it")
+	flags.StringVar(&opts.source, "source", string(ftep.SearchSourceAuto), "Browser source: auto, ena, or ncbi")
+	flags.BoolVar(&opts.printURL, "print-url", false, "Print the browser URL instead of opening it")
 
 	return cmd
 }
@@ -45,7 +52,12 @@ func executeOpen(cmd *cobra.Command, args []string, opts openOptions) error {
 		return err
 	}
 
-	browserURL, err := enaBrowserURL(accession)
+	source, err := parseSearchSource(opts.source)
+	if err != nil {
+		return err
+	}
+
+	browserURL, err := accessionBrowserURL(accession, source)
 	if err != nil {
 		return err
 	}
@@ -74,17 +86,87 @@ func openAccessionFromInputs(flagAccession string, args []string) (string, error
 	return "", fmt.Errorf("accession is required")
 }
 
-func enaBrowserURL(accession string) (string, error) {
+func accessionBrowserURL(accession string, source ftep.SearchSource) (string, error) {
 	accession = strings.TrimSpace(accession)
 	if accession == "" {
 		return "", fmt.Errorf("accession is required")
 	}
 
-	if _, _, ok := ftep.IdentifyAccession(accession); !ok {
+	_, accessionType, ok := ftep.IdentifyAccession(accession)
+	if !ok {
 		return "", fmt.Errorf("accession format not recognised: %s", accession)
 	}
 
-	return enaBrowserViewBaseURL + url.PathEscape(accession), nil
+	source, err := openBrowserSource(accession, accessionType, source)
+	if err != nil {
+		return "", err
+	}
+
+	switch source {
+	case ftep.SearchSourceENA:
+		return enaBrowserViewBaseURL + url.PathEscape(accession), nil
+	case ftep.SearchSourceNCBI:
+		return ncbiBrowserURL(accession, accessionType), nil
+	default:
+		return "", fmt.Errorf("unsupported source %q; expected auto, ena, or ncbi", source)
+	}
+}
+
+func openBrowserSource(accession string, accessionType ftep.AccessionType, source ftep.SearchSource) (ftep.SearchSource, error) {
+	switch source {
+	case ftep.SearchSourceAuto:
+		if enaBrowserSupports(accession, accessionType) {
+			return ftep.SearchSourceENA, nil
+		}
+		if ncbiBrowserSupports(accessionType) {
+			return ftep.SearchSourceNCBI, nil
+		}
+	case ftep.SearchSourceENA:
+		if enaBrowserSupports(accession, accessionType) {
+			return ftep.SearchSourceENA, nil
+		}
+		return "", fmt.Errorf("accession is not supported by the ENA browser: %s", accession)
+	case ftep.SearchSourceNCBI:
+		if ncbiBrowserSupports(accessionType) {
+			return ftep.SearchSourceNCBI, nil
+		}
+		return "", fmt.Errorf("accession is not supported by the NCBI browser: %s", accession)
+	}
+
+	return "", fmt.Errorf("accession is not supported by an available browser: %s", accession)
+}
+
+func enaBrowserSupports(accession string, accessionType ftep.AccessionType) bool {
+	upper := strings.ToUpper(strings.TrimSpace(accession))
+	switch accessionType {
+	case ftep.AccessionTypeAssembly:
+		return strings.HasPrefix(upper, "GCA_")
+	case ftep.AccessionTypeSequence, ftep.AccessionTypeCoding:
+		return !strings.Contains(upper, "_")
+	default:
+		return true
+	}
+}
+
+func ncbiBrowserSupports(accessionType ftep.AccessionType) bool {
+	switch accessionType {
+	case ftep.AccessionTypeAssembly, ftep.AccessionTypeContigSet, ftep.AccessionTypeWGSSet, ftep.AccessionTypeTSASet, ftep.AccessionTypeTLSSet, ftep.AccessionTypeSequence, ftep.AccessionTypeCoding:
+		return true
+	default:
+		return false
+	}
+}
+
+func ncbiBrowserURL(accession string, accessionType ftep.AccessionType) string {
+	accession = strings.ToUpper(strings.TrimSpace(accession))
+	switch accessionType {
+	case ftep.AccessionTypeAssembly:
+		return ncbiAssemblyBrowserBaseURL + url.PathEscape(accession) + "/"
+	case ftep.AccessionTypeCoding:
+		return ncbiProteinBrowserBaseURL + url.PathEscape(accession)
+	default:
+		return ncbiNuccoreBrowserBaseURL + url.PathEscape(accession)
+	}
 }
 
 func openURLInBrowser(browserURL string) error {
