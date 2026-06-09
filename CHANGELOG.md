@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add a weekly GitHub Actions live smoke test for the public ENA and NCBI endpoints.
 - Add ENA `sequence`, `coding`, `tsa_set`, and `tls_set` search support.
 - Add support for WGS/TSA/TLS short set IDs and component-shaped sequence accessions.
 - Add `ichsm search --source auto|ena|ncbi`, defaulting to ENA first with NCBI fallback.
