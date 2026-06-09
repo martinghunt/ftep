@@ -9,6 +9,7 @@ type searchEndpoint struct {
 
 var urlSearchData = map[AccessionType]searchEndpoint{
 	AccessionTypeAssembly:   {mainType: "search", result: "assembly"},
+	AccessionTypeStudy:      {mainType: "search", result: "study"},
 	AccessionTypeSample:     {mainType: "search", result: "sample"},
 	AccessionTypeRun:        {mainType: "search", result: "read_run"},
 	AccessionTypeExperiment: {mainType: "search", result: "read_run"},
@@ -16,6 +17,24 @@ var urlSearchData = map[AccessionType]searchEndpoint{
 
 var assemblySmall = []string{"accession", "sample_accession", "run_accession", "version"}
 var assemblyDefault = append(copyStrings(assemblySmall), "scientific_name", "tax_id")
+
+var studySmall = []string{
+	"study_accession",
+	"secondary_study_accession",
+}
+var studyDefault = append(copyStrings(studySmall),
+	"study_title",
+	"project_name",
+)
+var studyBig = append(copyStrings(studyDefault),
+	"study_description",
+	"center_name",
+	"broker_name",
+	"first_public",
+	"last_updated",
+	"scientific_name",
+	"tax_id",
+)
 
 var sampleSmall = []string{
 	"study_accession",
@@ -53,6 +72,11 @@ var fieldPresets = map[AccessionType]map[string][]string{
 		"SMALL":   assemblySmall,
 		"DEFAULT": assemblyDefault,
 		"BIG":     assemblyDefault,
+	},
+	AccessionTypeStudy: {
+		"SMALL":   studySmall,
+		"DEFAULT": studyDefault,
+		"BIG":     studyBig,
 	},
 	AccessionTypeSample: {
 		"SMALL":   sampleSmall,

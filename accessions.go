@@ -7,6 +7,7 @@ type AccessionType string
 
 const (
 	AccessionTypeAssembly   AccessionType = "assembly"
+	AccessionTypeStudy      AccessionType = "study"
 	AccessionTypeSample     AccessionType = "sample"
 	AccessionTypeRun        AccessionType = "run"
 	AccessionTypeExperiment AccessionType = "experiment"
@@ -19,6 +20,8 @@ type accessionRegex struct {
 
 var accessionRegexes = []accessionRegex{
 	{regexp.MustCompile(`^(GCA_[0-9]{9})(\.[0-9]*)*$`), AccessionTypeAssembly},
+	{regexp.MustCompile(`^(PRJ(?:E|D|N)[A-Z][0-9]+)$`), AccessionTypeStudy},
+	{regexp.MustCompile(`^((?:E|D|S)RP[0-9]{6,})$`), AccessionTypeStudy},
 	{regexp.MustCompile(`^(SAM(?:E|D|N)[A-Z]?[0-9]+)$`), AccessionTypeSample},
 	{regexp.MustCompile(`^((?:E|D|S)RS[0-9]{6,})$`), AccessionTypeSample},
 	{regexp.MustCompile(`^((?:E|D|S)RR[0-9]{6,})$`), AccessionTypeRun},

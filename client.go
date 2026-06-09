@@ -53,6 +53,8 @@ func SearchKeyValue(queryType AccessionType, accession string) (string, string, 
 	switch queryType {
 	case AccessionTypeAssembly:
 		return "query", "accession=" + accession, nil
+	case AccessionTypeStudy:
+		return "query", "study_accession=" + accession + " OR secondary_study_accession=" + accession, nil
 	case AccessionTypeSample:
 		return "query", "sample_accession=" + accession + " OR secondary_sample_accession=" + accession, nil
 	case AccessionTypeRun:

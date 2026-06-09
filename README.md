@@ -2,7 +2,7 @@
 
 Finding things in the ENA portal.
 
-Currently supported: run, sample, assembly accessions.
+Currently supported: run, experiment, sample, study/project, assembly accessions.
 
 This repository was developed with substantial coding assistance from
 [OpenAI Codex](https://openai.com/codex), which helped with implementation,
@@ -65,6 +65,16 @@ ftep search -a SAMN05276490 -c ALL
 Get runs for sample `SAMN05276490`:
 ```
 ftep search -a SAMN05276490 --s2r
+```
+
+Get metadata for study/project `PRJEB1787`:
+```
+ftep search -a PRJEB1787
+```
+
+Get metadata for study accession `ERP001736`:
+```
+ftep search -a ERP001736
 ```
 
 Get metadata for run `SRR3675520`:

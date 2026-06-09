@@ -47,6 +47,45 @@ func TestQuerySampleToRun(t *testing.T) {
 	}
 }
 
+func TestQueryStudy(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "study" {
+			t.Fatalf("result = %q, want study", got)
+		}
+		if got := query.Get("query"); got != "study_accession=PRJEB1787 OR secondary_study_accession=PRJEB1787" {
+			t.Fatalf("query = %q", got)
+		}
+		if got := query.Get("format"); got != "json" {
+			t.Fatalf("format = %q, want json", got)
+		}
+		if got := query.Get("fields"); got != "study_accession,secondary_study_accession,study_title,project_name" {
+			t.Fatalf("fields = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"study_accession":"PRJEB1787","secondary_study_accession":"ERP001736","study_title":"Tara Oceans"}]`))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	fields, records, err := client.Query(context.Background(), "PRJEB1787", AccessionTypeStudy, []string{"DEFAULT"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(fields, studyDefault) {
+		t.Fatalf("fields = %#v, want %#v", fields, studyDefault)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len(records) = %d, want 1", len(records))
+	}
+	if records[0]["secondary_study_accession"] != "ERP001736" {
+		t.Fatalf("secondary_study_accession = %q", records[0]["secondary_study_accession"])
+	}
+}
+
 func TestGetAllowedFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/searchFields" {
