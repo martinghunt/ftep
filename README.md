@@ -57,6 +57,11 @@ Get metadata for sample `SAMN05276490` in JSON format:
 ftep search -a SAMN05276490 --outfmt json
 ```
 
+Get metadata for sample `SAMN05276490` as an aligned table:
+```
+ftep search -a SAMN05276490 --outfmt table
+```
+
 Get all available metadata for sample `SAMN05276490`:
 ```
 ftep search -a SAMN05276490 -c ALL
@@ -87,14 +92,19 @@ Get a FASTQ download manifest for sample `SAMN05276490`:
 ftep reads -a SAMN05276490
 ```
 
+Get the FASTQ download manifest as an aligned table:
+```
+ftep reads -a SAMN05276490 --outfmt table
+```
+
 Print `wget` commands to download FASTQs for sample `SAMN05276490`:
 ```
-ftep reads -a SAMN05276490 --format wget
+ftep reads -a SAMN05276490 --outfmt wget
 ```
 
 Print MD5 checksum lines for those FASTQs:
 ```
-ftep reads -a SAMN05276490 --format md5
+ftep reads -a SAMN05276490 --outfmt md5
 ```
 
 Open sample `SAMN05276490` in the ENA browser:
@@ -110,7 +120,7 @@ ftep open SRR3675520 --print-url
 List available ENA data types and whether `ftep search` supports them, with
 supported types first:
 ```
-ftep get_fields
+ftep get_fields --outfmt table
 ```
 
 List available fields for ENA data type `read_run`:

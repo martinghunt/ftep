@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `ftep reads` to print FASTQ download manifests, URLs, `wget` commands, `curl` commands, or MD5 checksum lines.
 - Add `ftep open` to open an accession in the ENA browser or print its browser URL.
 - Let `ftep get_fields` list available ENA data types and whether `ftep search` supports them when no data type is supplied.
+- Add aligned table output for `ftep search`, `ftep reads`, and `ftep get_fields`.
+
+### Changed
+- Use `ftep reads --outfmt` for output selection, matching `ftep search` and `ftep get_fields`.
 
 ### Removed
 - Remove `ftep search --s2r`; use `ftep search --level run` instead.

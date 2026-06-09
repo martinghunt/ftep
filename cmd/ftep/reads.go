@@ -14,6 +14,7 @@ import (
 
 const (
 	readsFormatManifest = "manifest"
+	readsFormatTable    = "table"
 	readsFormatURLs     = "urls"
 	readsFormatWget     = "wget"
 	readsFormatCurl     = "curl"
@@ -28,7 +29,7 @@ var readsFields = []string{"run_accession", "fastq_ftp", "fastq_md5", "fastq_byt
 type readsOptions struct {
 	accession string
 	accFile   string
-	format    string
+	outfmt    string
 	protocol  string
 	outputDir string
 	debug     bool
@@ -46,7 +47,7 @@ type readFile struct {
 
 func newReadsCommand() *cobra.Command {
 	opts := readsOptions{
-		format:   readsFormatManifest,
+		outfmt:   readsFormatManifest,
 		protocol: readsProtocolHTTPS,
 	}
 
@@ -64,7 +65,7 @@ func newReadsCommand() *cobra.Command {
 	flags.StringVarP(&opts.accession, "accession", "a", "", "Accession to find reads for")
 	flags.StringVarP(&opts.accFile, "acc-file", "f", "", "File of accessions to find reads for, one per line")
 	flags.StringVar(&opts.accFile, "acc_file", "", "File of accessions to find reads for, one per line")
-	flags.StringVar(&opts.format, "format", opts.format, "Output format: manifest, urls, wget, curl, or md5")
+	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: manifest, table, urls, wget, curl, or md5")
 	flags.StringVar(&opts.protocol, "protocol", opts.protocol, "Download URL protocol: https or ftp")
 	flags.StringVarP(&opts.outputDir, "output-dir", "o", "", "Directory to use in printed output filenames")
 	_ = flags.MarkHidden("acc_file")
@@ -77,7 +78,7 @@ func executeReads(cmd *cobra.Command, opts readsOptions) error {
 		return fmt.Errorf("exactly one of -a/--accession or -f/--acc-file is required")
 	}
 
-	format, err := parseReadsFormat(opts.format)
+	outfmt, err := parseReadsOutfmt(opts.outfmt)
 	if err != nil {
 		return err
 	}
@@ -105,13 +106,15 @@ func executeReads(cmd *cobra.Command, opts readsOptions) error {
 		return errors.New("no FASTQ files found")
 	}
 
-	return writeReads(cmd.OutOrStdout(), files, format)
+	return writeReads(cmd.OutOrStdout(), files, outfmt)
 }
 
-func parseReadsFormat(format string) (string, error) {
-	switch strings.ToLower(strings.TrimSpace(format)) {
+func parseReadsOutfmt(outfmt string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(outfmt)) {
 	case readsFormatManifest:
 		return readsFormatManifest, nil
+	case readsFormatTable, "human":
+		return readsFormatTable, nil
 	case readsFormatURLs:
 		return readsFormatURLs, nil
 	case readsFormatWget:
@@ -121,7 +124,7 @@ func parseReadsFormat(format string) (string, error) {
 	case readsFormatMD5:
 		return readsFormatMD5, nil
 	default:
-		return "", fmt.Errorf("unsupported --format %q; expected manifest, urls, wget, curl, or md5", format)
+		return "", fmt.Errorf("unsupported --outfmt %q; expected manifest, table, urls, wget, curl, or md5", outfmt)
 	}
 }
 
@@ -241,6 +244,8 @@ func writeReads(out io.Writer, files []readFile, format string) error {
 	switch format {
 	case readsFormatManifest:
 		return writeReadsManifest(out, files)
+	case readsFormatTable:
+		return writeAlignedRows(out, readFilesRows(files))
 	case readsFormatURLs:
 		for _, file := range files {
 			fmt.Fprintln(out, file.URL)
@@ -268,18 +273,22 @@ func writeReads(out io.Writer, files []readFile, format string) error {
 }
 
 func writeReadsManifest(out io.Writer, files []readFile) error {
-	fmt.Fprintln(out, "input_accession\trun_accession\tfilename\turl\tmd5\tbytes")
+	return writeDelimitedRows(out, readFilesRows(files), "\t")
+}
+
+func readFilesRows(files []readFile) [][]string {
+	rows := [][]string{{"input_accession", "run_accession", "filename", "url", "md5", "bytes"}}
 	for _, file := range files {
-		fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		rows = append(rows, []string{
 			file.InputAccession,
 			file.RunAccession,
 			file.Filename,
 			file.URL,
 			emptyAsDot(file.MD5),
 			emptyAsDot(file.Bytes),
-		)
+		})
 	}
-	return nil
+	return rows
 }
 
 func emptyAsDot(value string) string {

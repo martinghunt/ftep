@@ -18,6 +18,12 @@ import (
 var version = "local"
 var newClient = ftep.NewClient
 
+const (
+	outputFormatJSON  = "json"
+	outputFormatTable = "table"
+	outputFormatTSV   = "tsv"
+)
+
 func main() {
 	log.SetPrefix("[ftep] ")
 	log.SetFlags(0)
@@ -63,7 +69,7 @@ type searchOptions struct {
 func newSearchCommand() *cobra.Command {
 	opts := searchOptions{
 		columns: "DEFAULT",
-		outfmt:  "tsv",
+		outfmt:  outputFormatTSV,
 	}
 	cmd := &cobra.Command{
 		Use:   "search",
@@ -82,7 +88,7 @@ func newSearchCommand() *cobra.Command {
 	flags.StringVarP(&opts.columns, "columns", "c", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.columns, "fields", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, or assembly. Default is the input accession level")
-	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json or tsv")
+	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json, table, or tsv")
 	_ = flags.MarkHidden("acc_file")
 
 	return cmd
@@ -92,8 +98,9 @@ func executeSearch(cmd *cobra.Command, opts searchOptions) error {
 	if (opts.accession == "") == (opts.accFile == "") {
 		return fmt.Errorf("exactly one of -a/--accession or -f/--acc_file is required")
 	}
-	if opts.outfmt != "tsv" && opts.outfmt != "json" {
-		return fmt.Errorf("unsupported --outfmt %q; expected json or tsv", opts.outfmt)
+	outfmt, err := parseOutputFormat(opts.outfmt, true)
+	if err != nil {
+		return err
 	}
 
 	accessions, err := accessionsFromInputs(opts.accession, opts.accFile)
@@ -113,11 +120,32 @@ func executeSearch(cmd *cobra.Command, opts searchOptions) error {
 		return err
 	}
 
-	if opts.outfmt == "json" {
+	if outfmt == outputFormatJSON {
 		return writeJSON(cmd.OutOrStdout(), results)
+	}
+	if outfmt == outputFormatTable {
+		return writeTable(cmd.OutOrStdout(), results, fields)
 	}
 
 	return writeTSV(cmd.OutOrStdout(), results, fields)
+}
+
+func parseOutputFormat(format string, allowJSON bool) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case outputFormatTSV:
+		return outputFormatTSV, nil
+	case outputFormatTable, "human":
+		return outputFormatTable, nil
+	case outputFormatJSON:
+		if allowJSON {
+			return outputFormatJSON, nil
+		}
+	}
+
+	if allowJSON {
+		return "", fmt.Errorf("unsupported --outfmt %q; expected json, table, or tsv", format)
+	}
+	return "", fmt.Errorf("unsupported --outfmt %q; expected table or tsv", format)
 }
 
 func parseSearchLevel(level string) (ftep.AccessionType, error) {
@@ -139,15 +167,20 @@ func parseSearchLevel(level string) (ftep.AccessionType, error) {
 
 func newGetFieldsCommand() *cobra.Command {
 	var debug bool
+	outfmt := outputFormatTSV
 
 	cmd := &cobra.Command{
 		Use:   "get_fields [data_type]",
 		Short: "List ENA data types or fields for a given data type",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			parsedOutfmt, err := parseOutputFormat(outfmt, false)
+			if err != nil {
+				return err
+			}
+
 			client := newClient()
 			var text string
-			var err error
 			if len(args) == 0 {
 				if debug {
 					log.Printf("getting available data types")
@@ -165,10 +198,14 @@ func newGetFieldsCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if parsedOutfmt == outputFormatTable {
+				return writeAlignedRows(cmd.OutOrStdout(), tsvTextRows(text))
+			}
 			return writeTextWithTrailingNewline(cmd.OutOrStdout(), text)
 		},
 	}
 	cmd.Flags().BoolVar(&debug, "debug", false, "More verbose logging")
+	cmd.Flags().StringVar(&outfmt, "outfmt", outfmt, "Output format: table or tsv")
 	return cmd
 }
 
@@ -328,7 +365,24 @@ func writeJSON(out io.Writer, results []ftep.SearchResult) error {
 }
 
 func writeTSV(out io.Writer, results []ftep.SearchResult, requestedFields []string) error {
+	rows, err := searchRows(results, requestedFields)
+	if err != nil {
+		return err
+	}
+	return writeDelimitedRows(out, rows, "\t")
+}
+
+func writeTable(out io.Writer, results []ftep.SearchResult, requestedFields []string) error {
+	rows, err := searchRows(results, requestedFields)
+	if err != nil {
+		return err
+	}
+	return writeAlignedRows(out, rows)
+}
+
+func searchRows(results []ftep.SearchResult, requestedFields []string) ([][]string, error) {
 	var columns []string
+	var rows [][]string
 	for _, result := range results {
 		if len(result.Records) == 0 {
 			continue
@@ -340,9 +394,9 @@ func writeTSV(out io.Writer, results []ftep.SearchResult, requestedFields []stri
 			} else {
 				columns = result.Fields
 			}
-			fmt.Fprintln(out, strings.Join(append([]string{"input_accession"}, columns...), "\t"))
+			rows = append(rows, append([]string{"input_accession"}, columns...))
 		} else if !requestedAllFields(requestedFields) && !sameStringSet(columns, result.Fields) {
-			return fmt.Errorf("field set changed between results")
+			return nil, fmt.Errorf("field set changed between results")
 		}
 
 		for _, record := range result.Records {
@@ -351,10 +405,10 @@ func writeTSV(out io.Writer, results []ftep.SearchResult, requestedFields []stri
 			for _, column := range columns {
 				row = append(row, formatValue(record[column]))
 			}
-			fmt.Fprintln(out, strings.Join(row, "\t"))
+			rows = append(rows, row)
 		}
 	}
-	return nil
+	return rows, nil
 }
 
 func requestedAllFields(fields []string) bool {

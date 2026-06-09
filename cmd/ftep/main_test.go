@@ -47,6 +47,35 @@ func TestRunSearchWritesTSV(t *testing.T) {
 	}
 }
 
+func TestRunSearchWritesTable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "sample" {
+			t.Fatalf("result = %q, want sample", got)
+		}
+		_, _ = w.Write([]byte(`[{"secondary_sample_accession":"SRS123456","collection_date":"2016-01-01","country":""}]`))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "SAMN05276490", "--outfmt", "table"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "input_accession  secondary_sample_accession  collection_date  country\n" +
+		"SAMN05276490     SRS123456                   2016-01-01       .\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunSearchWithLevel(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
@@ -155,6 +184,31 @@ func TestRunReadsWritesManifest(t *testing.T) {
 	}
 }
 
+func TestRunReadsWritesTable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`[{"run_accession":"SRR3675520","fastq_ftp":"f.gz","fastq_md5":"abc","fastq_bytes":"10"}]`))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"reads", "-a", "SAMN05276490", "--outfmt", "table"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "input_accession  run_accession  filename  url           md5  bytes\n" +
+		"SAMN05276490     SRR3675520     f.gz      https://f.gz  abc  10\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunReadsWritesWget(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
@@ -173,7 +227,7 @@ func TestRunReadsWritesWget(t *testing.T) {
 
 	withTestClient(t, server)
 	code, stdout := captureStdout(t, func() int {
-		return run([]string{"reads", "-a", "ERR123456", "--format", "wget", "--protocol", "ftp", "--output-dir", "reads"})
+		return run([]string{"reads", "-a", "ERR123456", "--outfmt", "wget", "--protocol", "ftp", "--output-dir", "reads"})
 	})
 
 	if code != 0 {
@@ -197,7 +251,7 @@ func TestRunReadsWritesMD5(t *testing.T) {
 
 	withTestClient(t, server)
 	code, stdout := captureStdout(t, func() int {
-		return run([]string{"reads", "-a", "ERR123456", "--format", "md5", "--output-dir", "reads"})
+		return run([]string{"reads", "-a", "ERR123456", "--outfmt", "md5", "--output-dir", "reads"})
 	})
 
 	if code != 0 {
@@ -314,6 +368,32 @@ func TestRunGetFieldsForDataType(t *testing.T) {
 	}
 }
 
+func TestRunGetFieldsWritesTable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/results" {
+			t.Fatalf("path = %q, want /results", r.URL.Path)
+		}
+		_, _ = w.Write([]byte("resultId\tdescription\nsample\tSamples\nanalysis\tAnalyses\n"))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"get_fields", "--outfmt", "table"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "resultId  description  ftep_search\n" +
+		"sample    Samples      yes\n" +
+		"analysis  Analyses     no\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestWriteReadsCurl(t *testing.T) {
 	files := []readFile{
 		{
@@ -354,6 +434,23 @@ func TestWriteTSVAllFieldsSortsColumnsAndFormatsNil(t *testing.T) {
 
 	const want = "input_accession\ta_field\tm_field\tz_field\n" +
 		"SAMN05276490\tfirst\t.\tlast\n"
+	if out.String() != want {
+		t.Fatalf("stdout = %q, want %q", out.String(), want)
+	}
+}
+
+func TestWriteAlignedRows(t *testing.T) {
+	var out bytes.Buffer
+	err := writeAlignedRows(&out, [][]string{
+		{"a", "long"},
+		{"aa", "x"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const want = "a   long\n" +
+		"aa  x\n"
 	if out.String() != want {
 		t.Fatalf("stdout = %q, want %q", out.String(), want)
 	}
