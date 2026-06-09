@@ -58,6 +58,11 @@ func SearchKeyValue(queryType AccessionType, resultType AccessionType, accession
 			return "", "", unsupportedSearchLevel(queryType, resultType)
 		}
 		return "query", "accession=" + accession, nil
+	case AccessionTypeWGSSet:
+		if resultType != AccessionTypeWGSSet {
+			return "", "", unsupportedSearchLevel(queryType, resultType)
+		}
+		return "query", "wgs_set=" + accession, nil
 	case AccessionTypeStudy:
 		switch resultType {
 		case AccessionTypeStudy:
@@ -208,10 +213,14 @@ func ResolveSearchLevel(inputType AccessionType, level AccessionType) (Accession
 		return inputType, nil
 	}
 
+	if inputType == AccessionTypeWGSSet && level == AccessionTypeAssembly {
+		return AccessionTypeWGSSet, nil
+	}
+
 	switch level {
-	case AccessionTypeAssembly, AccessionTypeStudy, AccessionTypeSample, AccessionTypeRun:
+	case AccessionTypeAssembly, AccessionTypeWGSSet, AccessionTypeStudy, AccessionTypeSample, AccessionTypeRun:
 	default:
-		return "", fmt.Errorf("unsupported search level %q; expected study, sample, run, or assembly", level)
+		return "", fmt.Errorf("unsupported search level %q; expected study, sample, run, assembly, or wgs_set", level)
 	}
 
 	if _, _, err := SearchKeyValue(inputType, level, ""); err != nil {

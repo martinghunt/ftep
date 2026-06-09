@@ -87,7 +87,7 @@ func newSearchCommand() *cobra.Command {
 	flags.StringVar(&opts.accFile, "acc_file", "", "File of accessions to search for, one per line")
 	flags.StringVarP(&opts.columns, "columns", "c", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
 	flags.StringVar(&opts.columns, "fields", opts.columns, "Columns/fields to output, comma-separated, or SMALL, DEFAULT, BIG, ALL")
-	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, or assembly. Default is the input accession level")
+	flags.StringVar(&opts.level, "level", "", "Output level: study, sample, run, assembly, or wgs_set. Default is the input accession level")
 	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json, table, or tsv")
 	_ = flags.MarkHidden("acc_file")
 
@@ -160,8 +160,10 @@ func parseSearchLevel(level string) (ftep.AccessionType, error) {
 		return ftep.AccessionTypeRun, nil
 	case string(ftep.AccessionTypeAssembly):
 		return ftep.AccessionTypeAssembly, nil
+	case string(ftep.AccessionTypeWGSSet):
+		return ftep.AccessionTypeWGSSet, nil
 	default:
-		return "", fmt.Errorf("unsupported --level %q; expected study, sample, run, or assembly", level)
+		return "", fmt.Errorf("unsupported --level %q; expected study, sample, run, assembly, or wgs_set", level)
 	}
 }
 
@@ -258,7 +260,7 @@ func appendFTEPSearchColumn(text string) string {
 
 func ftepSearchSupportsResult(resultType string) bool {
 	switch resultType {
-	case "assembly", "read_run", "sample", "study":
+	case "assembly", "read_run", "sample", "study", "wgs_set":
 		return true
 	default:
 		return false

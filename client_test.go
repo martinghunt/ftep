@@ -92,6 +92,45 @@ func TestQueryStudy(t *testing.T) {
 	}
 }
 
+func TestQueryWGSSet(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "wgs_set" {
+			t.Fatalf("result = %q, want wgs_set", got)
+		}
+		if got := query.Get("query"); got != "wgs_set=AGQU01" {
+			t.Fatalf("query = %q", got)
+		}
+		if got := query.Get("fields"); got != "accession,wgs_set,assembly_accession,sample_accession,run_accession,sequence_version,scientific_name,tax_id" {
+			t.Fatalf("fields = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"accession":"AGQU01000000","wgs_set":"AGQU01","assembly_accession":"GCA_000231155"}]`))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	resultType, fields, records, err := client.Query(context.Background(), "AGQU01", AccessionTypeWGSSet, []string{"DEFAULT"}, AccessionTypeAssembly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resultType != AccessionTypeWGSSet {
+		t.Fatalf("resultType = %q, want %q", resultType, AccessionTypeWGSSet)
+	}
+	if !reflect.DeepEqual(fields, wgsSetDefault) {
+		t.Fatalf("fields = %#v, want %#v", fields, wgsSetDefault)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len(records) = %d, want 1", len(records))
+	}
+	if records[0]["assembly_accession"] != "GCA_000231155" {
+		t.Fatalf("assembly_accession = %q", records[0]["assembly_accession"])
+	}
+}
+
 func TestQuerySecondaryStudyAtSampleLevel(t *testing.T) {
 	var sawStudyLookup bool
 	var sawSampleSearch bool

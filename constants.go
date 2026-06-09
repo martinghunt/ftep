@@ -9,6 +9,7 @@ type searchEndpoint struct {
 
 var urlSearchData = map[AccessionType]searchEndpoint{
 	AccessionTypeAssembly:   {mainType: "search", result: "assembly"},
+	AccessionTypeWGSSet:     {mainType: "search", result: "wgs_set"},
 	AccessionTypeStudy:      {mainType: "search", result: "study"},
 	AccessionTypeSample:     {mainType: "search", result: "sample"},
 	AccessionTypeRun:        {mainType: "search", result: "read_run"},
@@ -17,6 +18,9 @@ var urlSearchData = map[AccessionType]searchEndpoint{
 
 var assemblySmall = []string{"accession", "sample_accession", "run_accession", "version"}
 var assemblyDefault = append(copyStrings(assemblySmall), "scientific_name", "tax_id")
+
+var wgsSetSmall = []string{"accession", "wgs_set", "assembly_accession", "sample_accession", "run_accession", "sequence_version"}
+var wgsSetDefault = append(copyStrings(wgsSetSmall), "scientific_name", "tax_id")
 
 var studySmall = []string{
 	"study_accession",
@@ -72,6 +76,11 @@ var fieldPresets = map[AccessionType]map[string][]string{
 		"SMALL":   assemblySmall,
 		"DEFAULT": assemblyDefault,
 		"BIG":     assemblyDefault,
+	},
+	AccessionTypeWGSSet: {
+		"SMALL":   wgsSetSmall,
+		"DEFAULT": wgsSetDefault,
+		"BIG":     wgsSetDefault,
 	},
 	AccessionTypeStudy: {
 		"SMALL":   studySmall,

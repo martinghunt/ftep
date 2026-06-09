@@ -148,6 +148,41 @@ func TestRunSearchWritesJSON(t *testing.T) {
 	}
 }
 
+func TestRunSearchWGSSetWritesTSV(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "wgs_set" {
+			t.Fatalf("result = %q, want wgs_set", got)
+		}
+		if got := query.Get("query"); got != "wgs_set=AGQU01" {
+			t.Fatalf("query = %q", got)
+		}
+		if got := query.Get("fields"); got != "accession,wgs_set,assembly_accession,sample_accession,run_accession,sequence_version,scientific_name,tax_id" {
+			t.Fatalf("fields = %q", got)
+		}
+		_, _ = w.Write([]byte(`[{"accession":"AGQU01000000","wgs_set":"AGQU01","assembly_accession":"GCA_000231155","sequence_version":"1","scientific_name":"Mycobacteroides abscessus 47J26","tax_id":"1087483","sample_accession":"SAMN02471593","run_accession":""}]`))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "AGQU00000000.1", "--level", "assembly"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "input_accession\taccession\twgs_set\tassembly_accession\tsample_accession\trun_accession\tsequence_version\tscientific_name\ttax_id\n" +
+		"AGQU00000000.1\tAGQU01000000\tAGQU01\tGCA_000231155\tSAMN02471593\t.\t1\tMycobacteroides abscessus 47J26\t1087483\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunReadsWritesManifest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
@@ -279,6 +314,21 @@ func TestRunOpenPrintsURL(t *testing.T) {
 	}
 }
 
+func TestRunOpenPrintsWGSSetURL(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "AGQU00000000.1", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ebi.ac.uk/ena/browser/view/AGQU00000000.1\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunOpenUsesBrowserOpener(t *testing.T) {
 	var openedURL string
 	withTestBrowserOpener(t, func(browserURL string) error {
@@ -318,7 +368,7 @@ func TestRunGetFieldsListsDataTypes(t *testing.T) {
 		if r.URL.Path != "/results" {
 			t.Fatalf("path = %q, want /results", r.URL.Path)
 		}
-		_, _ = w.Write([]byte("resultId\tdescription\tprimaryAccessionType\ntls_set\tTargeted locus study contig sets\taccession\nsample\tSamples\tsample_accession\nanalysis\tAnalyses\tanalysis_accession\nread_run\tRaw reads\trun_accession\n"))
+		_, _ = w.Write([]byte("resultId\tdescription\tprimaryAccessionType\ntls_set\tTargeted locus study contig sets\taccession\nsample\tSamples\tsample_accession\nanalysis\tAnalyses\tanalysis_accession\nwgs_set\tGenome assembly contig set (WGS)\taccession\nread_run\tRaw reads\trun_accession\n"))
 	}))
 	defer server.Close()
 
@@ -334,6 +384,7 @@ func TestRunGetFieldsListsDataTypes(t *testing.T) {
 	const want = "resultId\tdescription\tprimaryAccessionType\tftep_search\n" +
 		"read_run\tRaw reads\trun_accession\tyes\n" +
 		"sample\tSamples\tsample_accession\tyes\n" +
+		"wgs_set\tGenome assembly contig set (WGS)\taccession\tyes\n" +
 		"analysis\tAnalyses\tanalysis_accession\tno\n" +
 		"tls_set\tTargeted locus study contig sets\taccession\tno\n"
 	if stdout != want {

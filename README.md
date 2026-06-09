@@ -2,7 +2,7 @@
 
 Finding things in the ENA portal.
 
-Currently supported: run, experiment, sample, study/project, assembly accessions.
+Currently supported: run, experiment, sample, study/project, assembly, and WGS master accessions.
 
 This repository was developed with substantial coding assistance from
 [OpenAI Codex](https://openai.com/codex), which helped with implementation,
@@ -141,6 +141,11 @@ ftep search -a SRR3675520
 Get metadata for assembly `GCA_000195955.2`:
 ```
 ftep search -a GCA_000195955.2
+```
+
+Get metadata for WGS master accession `AGQU00000000.1`:
+```
+ftep search -a AGQU00000000.1
 ```
 
 
