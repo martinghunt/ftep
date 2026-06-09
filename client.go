@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Record is one metadata record returned by the ENA portal.
+// Record is one metadata record returned by a metadata provider.
 type Record map[string]any
 
 // SearchSource is the metadata provider to query.
@@ -25,7 +25,7 @@ const (
 	SearchSourceNCBI SearchSource = "ncbi"
 )
 
-// Client queries the ENA portal API.
+// Client queries ENA and NCBI metadata services.
 type Client struct {
 	BaseURL     string
 	NCBIBaseURL string
@@ -54,7 +54,7 @@ type SearchResult struct {
 	Records        []Record      `json:"records"`
 }
 
-// NewClient returns a client configured for the public ENA portal.
+// NewClient returns a client configured for the public ENA and NCBI metadata services.
 func NewClient() *Client {
 	return &Client{
 		BaseURL: BasePortalURL,

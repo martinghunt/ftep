@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add aligned table output for `ichsm search`, `ichsm reads`, and `ichsm get_fields`.
 
 ### Changed
+- Refresh CLI help and Go documentation to describe ENA and NCBI support.
 - Rename the project, CLI, Go module path, and release artifacts from `ftep` to `ichsm`.
 - Use `ichsm reads --outfmt` for output selection, matching `ichsm search` and `ichsm get_fields`.
 

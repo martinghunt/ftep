@@ -42,7 +42,7 @@ func run(args []string) int {
 func newRootCommand(out io.Writer, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "ichsm",
-		Short:         "query the ENA",
+		Short:         "Find sequence metadata from ENA and NCBI",
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: false,
@@ -76,7 +76,7 @@ func newSearchCommand() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "General search from an accession or file of accessions",
+		Short: "Search ENA and NCBI metadata for accessions",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeSearch(cmd, opts)
