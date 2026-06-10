@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Add public read FASTQ manifest helpers for ENA run metadata, URLs, MD5 sums, and byte counts.
+
+### Changed
+- Make `ichsm reads` use the public read manifest API instead of private command helpers.
+
 ## [0.2.0] - 2026-06-09
 
 ### Added

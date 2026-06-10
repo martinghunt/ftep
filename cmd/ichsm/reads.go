@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/martinghunt/ichsm"
@@ -19,12 +17,7 @@ const (
 	readsFormatWget     = "wget"
 	readsFormatCurl     = "curl"
 	readsFormatMD5      = "md5"
-
-	readsProtocolHTTPS = "https"
-	readsProtocolFTP   = "ftp"
 )
-
-var readsFields = []string{"run_accession", "fastq_ftp", "fastq_md5", "fastq_bytes"}
 
 type readsOptions struct {
 	accession string
@@ -35,20 +28,10 @@ type readsOptions struct {
 	debug     bool
 }
 
-type readFile struct {
-	InputAccession string
-	RunAccession   string
-	Filename       string
-	OutputPath     string
-	URL            string
-	MD5            string
-	Bytes          string
-}
-
 func newReadsCommand() *cobra.Command {
 	opts := readsOptions{
 		outfmt:   readsFormatManifest,
-		protocol: readsProtocolHTTPS,
+		protocol: ichsm.ReadProtocolHTTPS,
 	}
 
 	cmd := &cobra.Command{
@@ -93,12 +76,15 @@ func executeReads(cmd *cobra.Command, opts readsOptions) error {
 	}
 
 	client := newClient()
-	results, err := searchAccessions(cmd.Context(), client, accessions, readsFields, ichsm.AccessionTypeRun, ichsm.SearchSourceENA, opts.debug, cmd.ErrOrStderr())
+	results, err := searchAccessions(cmd.Context(), client, accessions, ichsm.ReadFileFields, ichsm.AccessionTypeRun, ichsm.SearchSourceENA, opts.debug, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
 
-	files, err := readFilesFromResults(results, protocol, opts.outputDir)
+	files, err := ichsm.ReadFilesFromSearchResults(results, ichsm.ReadFileOptions{
+		Protocol:  protocol,
+		OutputDir: opts.outputDir,
+	})
 	if err != nil {
 		return err
 	}
@@ -129,118 +115,14 @@ func parseReadsOutfmt(outfmt string) (string, error) {
 }
 
 func parseReadsProtocol(protocol string) (string, error) {
-	switch strings.ToLower(strings.TrimSpace(protocol)) {
-	case readsProtocolHTTPS:
-		return readsProtocolHTTPS, nil
-	case readsProtocolFTP:
-		return readsProtocolFTP, nil
-	default:
+	parsed, err := ichsm.NormalizeReadFileProtocol(protocol)
+	if err != nil {
 		return "", fmt.Errorf("unsupported --protocol %q; expected https or ftp", protocol)
 	}
+	return parsed, nil
 }
 
-func readFilesFromResults(results []ichsm.SearchResult, protocol string, outputDir string) ([]readFile, error) {
-	var files []readFile
-	for _, result := range results {
-		for _, record := range result.Records {
-			recordFiles, err := readFilesFromRecord(result.InputAccession, record, protocol, outputDir)
-			if err != nil {
-				return nil, err
-			}
-			files = append(files, recordFiles...)
-		}
-	}
-	return files, nil
-}
-
-func readFilesFromRecord(inputAccession string, record ichsm.Record, protocol string, outputDir string) ([]readFile, error) {
-	runAccession := recordString(record, "run_accession")
-	urls := splitENAList(recordString(record, "fastq_ftp"))
-	md5s := splitENAList(recordString(record, "fastq_md5"))
-	byteCounts := splitENAList(recordString(record, "fastq_bytes"))
-
-	files := make([]readFile, 0, len(urls))
-	for i, rawURL := range urls {
-		url, err := normalizeDownloadURL(rawURL, protocol)
-		if err != nil {
-			return nil, err
-		}
-
-		filename := path.Base(strings.TrimPrefix(rawURL, "ftp://"))
-		if filename == "." || filename == "/" || filename == "" {
-			return nil, fmt.Errorf("could not determine filename from FASTQ URL %q", rawURL)
-		}
-
-		outputPath := filename
-		if outputDir != "" {
-			outputPath = filepath.Join(outputDir, filename)
-		}
-
-		files = append(files, readFile{
-			InputAccession: inputAccession,
-			RunAccession:   runAccession,
-			Filename:       filename,
-			OutputPath:     outputPath,
-			URL:            url,
-			MD5:            listValue(md5s, i),
-			Bytes:          listValue(byteCounts, i),
-		})
-	}
-
-	return files, nil
-}
-
-func recordString(record ichsm.Record, key string) string {
-	value := record[key]
-	if value == nil {
-		return ""
-	}
-	return fmt.Sprint(value)
-}
-
-func splitENAList(value string) []string {
-	if value == "" || value == "." {
-		return nil
-	}
-
-	parts := strings.Split(value, ";")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
-}
-
-func listValue(values []string, index int) string {
-	if index >= len(values) {
-		return ""
-	}
-	return values[index]
-}
-
-func normalizeDownloadURL(rawURL string, protocol string) (string, error) {
-	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" {
-		return "", errors.New("empty FASTQ URL")
-	}
-
-	if strings.HasPrefix(rawURL, "ftp://") {
-		rawURL = strings.TrimPrefix(rawURL, "ftp://")
-	}
-	if strings.HasPrefix(rawURL, "https://") {
-		rawURL = strings.TrimPrefix(rawURL, "https://")
-	}
-	if strings.HasPrefix(rawURL, "http://") {
-		rawURL = strings.TrimPrefix(rawURL, "http://")
-	}
-
-	return protocol + "://" + rawURL, nil
-}
-
-func writeReads(out io.Writer, files []readFile, format string) error {
+func writeReads(out io.Writer, files []ichsm.ReadFile, format string) error {
 	switch format {
 	case readsFormatManifest:
 		return writeReadsManifest(out, files)
@@ -272,11 +154,11 @@ func writeReads(out io.Writer, files []readFile, format string) error {
 	return nil
 }
 
-func writeReadsManifest(out io.Writer, files []readFile) error {
+func writeReadsManifest(out io.Writer, files []ichsm.ReadFile) error {
 	return writeDelimitedRows(out, readFilesRows(files), "\t")
 }
 
-func readFilesRows(files []readFile) [][]string {
+func readFilesRows(files []ichsm.ReadFile) [][]string {
 	rows := [][]string{{"input_accession", "run_accession", "filename", "url", "md5", "bytes"}}
 	for _, file := range files {
 		rows = append(rows, []string{

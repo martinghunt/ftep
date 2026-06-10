@@ -603,7 +603,7 @@ func TestRunGetFieldsWritesTable(t *testing.T) {
 }
 
 func TestWriteReadsCurl(t *testing.T) {
-	files := []readFile{
+	files := []ichsm.ReadFile{
 		{
 			OutputPath: "reads/file.fastq.gz",
 			URL:        "https://ftp.sra.ebi.ac.uk/file.fastq.gz",

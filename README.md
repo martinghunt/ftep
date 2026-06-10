@@ -236,6 +236,19 @@ func main() {
 }
 ```
 
+For ENA FASTQ download manifests, use `ReadFiles`:
+
+```go
+files, err := client.ReadFiles(context.Background(), ichsm.ReadFileOptions{
+	Accessions: []string{"ERR123456"},
+})
+if err != nil {
+	panic(err)
+}
+
+fmt.Println(files[0].URL, files[0].MD5)
+```
+
 
 ## For developers
 
