@@ -370,15 +370,10 @@ func searchAccessions(ctx context.Context, client *ichsm.Client, accessions []st
 
 		resultSource, resultType, newFields, records, err := client.QueryWithSource(ctx, accession.input, accession.fixed, accession.typ, fields, level, source)
 		if err != nil {
-			log.Printf("warning: error getting data for accession %s. Skipping", accession.input)
-			if debug {
-				log.Printf("warning: %v", err)
-			}
-			continue
+			return nil, fmt.Errorf("error getting data for accession %s: %w", accession.input, err)
 		}
 		if len(records) == 0 {
-			log.Printf("warning: no results returned for accession %s. Skipping", accession.input)
-			continue
+			return nil, fmt.Errorf("no results returned for accession %s", accession.input)
 		}
 
 		results = append(results, ichsm.SearchResult{

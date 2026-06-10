@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Make `ichsm search` fail clearly when any requested accession cannot be searched or returns no results, instead of silently leaving that accession out of the output.
+
 ## [0.3.0] - 2026-06-10
 
 ### Added

@@ -48,6 +48,69 @@ func TestRunSearchWritesTSV(t *testing.T) {
 	}
 }
 
+func TestRunSearchFailsInsteadOfWritingPartialOutput(t *testing.T) {
+	accessionFile, err := os.CreateTemp(t.TempDir(), "accessions-*.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accessionFile.WriteString("SAMN05276490\nSAMN00000001\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := accessionFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		query := r.URL.Query().Get("query")
+		switch {
+		case strings.Contains(query, "SAMN05276490"):
+			_, _ = w.Write([]byte(`[{"secondary_sample_accession":"SRS123456","collection_date":"2016-01-01","country":"France"}]`))
+		case strings.Contains(query, "SAMN00000001"):
+			http.Error(w, "upstream error", http.StatusBadGateway)
+		default:
+			t.Fatalf("query = %q", query)
+		}
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-f", accessionFile.Name()})
+	})
+
+	if code == 0 {
+		t.Fatal("expected non-zero exit code")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty output on partial failure", stdout)
+	}
+}
+
+func TestRunSearchFailsWhenNoRecordsReturned(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("path = %q, want /search", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "SAMN05276490"})
+	})
+
+	if code == 0 {
+		t.Fatal("expected non-zero exit code")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty output when no records are returned", stdout)
+	}
+}
+
 func TestRunSearchWritesTable(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
