@@ -423,19 +423,22 @@ func writeTable(out io.Writer, results []ichsm.SearchResult, requestedFields []s
 func searchRows(results []ichsm.SearchResult, requestedFields []string) ([][]string, error) {
 	var columns []string
 	var rows [][]string
+	allFields := requestedAllFields(requestedFields)
+	if allFields {
+		columns = allRecordKeys(results)
+	}
+
 	for _, result := range results {
 		if len(result.Records) == 0 {
 			continue
 		}
 
-		if columns == nil {
-			if requestedAllFields(requestedFields) {
-				columns = ichsm.SortedRecordKeys(result.Records[0])
-			} else {
+		if rows == nil {
+			if !allFields {
 				columns = result.Fields
 			}
 			rows = append(rows, append([]string{"input_accession"}, columns...))
-		} else if !requestedAllFields(requestedFields) && !sameStringSet(columns, result.Fields) {
+		} else if !allFields && !sameStringSet(columns, result.Fields) {
 			return nil, fmt.Errorf("field set changed between results")
 		}
 
@@ -443,12 +446,30 @@ func searchRows(results []ichsm.SearchResult, requestedFields []string) ([][]str
 			row := make([]string, 0, len(columns)+1)
 			row = append(row, result.InputAccession)
 			for _, column := range columns {
-				row = append(row, formatValue(record[column]))
+				row = append(row, formatRecordColumn(record, column, allFields))
 			}
 			rows = append(rows, row)
 		}
 	}
 	return rows, nil
+}
+
+func allRecordKeys(results []ichsm.SearchResult) []string {
+	keySet := map[string]bool{}
+	for _, result := range results {
+		for _, record := range result.Records {
+			for key := range record {
+				keySet[key] = true
+			}
+		}
+	}
+
+	keys := make([]string, 0, len(keySet))
+	for key := range keySet {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func requestedAllFields(fields []string) bool {
@@ -477,4 +498,12 @@ func formatValue(value any) string {
 		return "."
 	}
 	return fmt.Sprint(value)
+}
+
+func formatRecordColumn(record ichsm.Record, column string, nullMissing bool) string {
+	value, ok := record[column]
+	if !ok && nullMissing {
+		return "null"
+	}
+	return formatValue(value)
 }

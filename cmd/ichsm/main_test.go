@@ -699,7 +699,7 @@ func TestWriteReadsCurl(t *testing.T) {
 	}
 }
 
-func TestWriteTSVAllFieldsSortsColumnsAndFormatsNil(t *testing.T) {
+func TestWriteTSVAllFieldsUsesUnionOfRecordColumns(t *testing.T) {
 	results := []ichsm.SearchResult{
 		{
 			InputAccession: "SAMN05276490",
@@ -708,6 +708,18 @@ func TestWriteTSVAllFieldsSortsColumnsAndFormatsNil(t *testing.T) {
 					"z_field": "last",
 					"a_field": "first",
 					"m_field": nil,
+				},
+				{
+					"b_field": "later",
+					"z_field": "last again",
+				},
+			},
+		},
+		{
+			InputAccession: "SAMN00000002",
+			Records: []ichsm.Record{
+				{
+					"c_field": "second accession",
 				},
 			},
 		},
@@ -718,8 +730,10 @@ func TestWriteTSVAllFieldsSortsColumnsAndFormatsNil(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const want = "input_accession\ta_field\tm_field\tz_field\n" +
-		"SAMN05276490\tfirst\t.\tlast\n"
+	const want = "input_accession\ta_field\tb_field\tc_field\tm_field\tz_field\n" +
+		"SAMN05276490\tfirst\tnull\tnull\t.\tlast\n" +
+		"SAMN05276490\tnull\tlater\tnull\tnull\tlast again\n" +
+		"SAMN00000002\tnull\tnull\tsecond accession\tnull\tnull\n"
 	if out.String() != want {
 		t.Fatalf("stdout = %q, want %q", out.String(), want)
 	}

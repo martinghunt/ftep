@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Make `ichsm search` fail clearly when any requested accession cannot be searched or returns no results, instead of silently leaving that accession out of the output.
+- Include columns found in later records when `ichsm search --columns ALL` writes TSV or table output; records without a unioned column now show `null` for that cell.
 
 ## [0.3.0] - 2026-06-10
 
