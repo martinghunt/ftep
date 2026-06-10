@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add public read FASTQ manifest helpers for ENA run metadata, URLs, MD5 sums, and byte counts.
+- Add `ichsm open --source ncbi` support for run accessions via the NCBI SRA browser.
 
 ### Changed
 - Make `ichsm reads` use the public read manifest API instead of private command helpers.

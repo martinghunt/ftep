@@ -16,6 +16,7 @@ const (
 	ncbiAssemblyBrowserBaseURL = "https://www.ncbi.nlm.nih.gov/datasets/genome/"
 	ncbiNuccoreBrowserBaseURL  = "https://www.ncbi.nlm.nih.gov/nuccore/"
 	ncbiProteinBrowserBaseURL  = "https://www.ncbi.nlm.nih.gov/protein/"
+	ncbiSRABrowserBaseURL      = "https://www.ncbi.nlm.nih.gov/sra/?term="
 )
 
 var openBrowser = openURLInBrowser
@@ -150,7 +151,7 @@ func enaBrowserSupports(accession string, accessionType ichsm.AccessionType) boo
 
 func ncbiBrowserSupports(accessionType ichsm.AccessionType) bool {
 	switch accessionType {
-	case ichsm.AccessionTypeAssembly, ichsm.AccessionTypeContigSet, ichsm.AccessionTypeWGSSet, ichsm.AccessionTypeTSASet, ichsm.AccessionTypeTLSSet, ichsm.AccessionTypeSequence, ichsm.AccessionTypeCoding:
+	case ichsm.AccessionTypeAssembly, ichsm.AccessionTypeContigSet, ichsm.AccessionTypeWGSSet, ichsm.AccessionTypeTSASet, ichsm.AccessionTypeTLSSet, ichsm.AccessionTypeSequence, ichsm.AccessionTypeCoding, ichsm.AccessionTypeRun:
 		return true
 	default:
 		return false
@@ -164,6 +165,8 @@ func ncbiBrowserURL(accession string, accessionType ichsm.AccessionType) string 
 		return ncbiAssemblyBrowserBaseURL + url.PathEscape(accession) + "/"
 	case ichsm.AccessionTypeCoding:
 		return ncbiProteinBrowserBaseURL + url.PathEscape(accession)
+	case ichsm.AccessionTypeRun:
+		return ncbiSRABrowserBaseURL + url.QueryEscape(accession)
 	default:
 		return ncbiNuccoreBrowserBaseURL + url.PathEscape(accession)
 	}

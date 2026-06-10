@@ -510,6 +510,21 @@ func TestRunOpenCanForceNCBIForSharedNucleotideAccession(t *testing.T) {
 	}
 }
 
+func TestRunOpenCanForceNCBIForRunAccession(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"open", "DRR013337", "--source", "ncbi", "--print-url"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "https://www.ncbi.nlm.nih.gov/sra/?term=DRR013337\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
 func TestRunOpenRejectsNCBIOnlyAccessionWithENASource(t *testing.T) {
 	code, _ := captureStdout(t, func() int {
 		return run([]string{"open", "WP_002248791.1", "--source", "ena", "--print-url"})

@@ -140,6 +140,11 @@ Force NCBI for an accession that is also available from ENA:
 ichsm open U49845.1 --source ncbi --print-url
 ```
 
+Print the NCBI SRA URL for a run accession:
+```
+ichsm open DRR013337 --source ncbi --print-url
+```
+
 List available ENA data types and whether `ichsm search` supports them, with
 supported types first:
 ```
