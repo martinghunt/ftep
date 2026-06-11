@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `ichsm search --count` to report how many ENA records a search would return without fetching the metadata records.
+- Warn before large JSON searches that fan out from a study/project or contig set, so users can choose TSV output for very large result sets.
+
 ### Fixed
 - Make `ichsm search` fail clearly when any requested accession cannot be searched or returns no results, instead of silently leaving that accession out of the output.
 - Include columns found in later records when `ichsm search --columns ALL` writes TSV or table output; records without a unioned column now show `null` for that cell.

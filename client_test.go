@@ -345,6 +345,60 @@ func TestQuerySecondaryStudyAtSampleLevel(t *testing.T) {
 	}
 }
 
+func TestCountENASecondaryStudyAtRunLevel(t *testing.T) {
+	var sawStudyLookup bool
+	var sawCount bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			sawStudyLookup = true
+			query := r.URL.Query()
+			if got := query.Get("result"); got != "study" {
+				t.Fatalf("study result = %q, want study", got)
+			}
+			if got := query.Get("query"); got != "study_accession=ERP001736 OR secondary_study_accession=ERP001736" {
+				t.Fatalf("study query = %q", got)
+			}
+			if got := query.Get("fields"); got != "study_accession" {
+				t.Fatalf("study fields = %q", got)
+			}
+			_, _ = w.Write([]byte(`[{"study_accession":"PRJEB1787"}]`))
+		case "/count":
+			sawCount = true
+			query := r.URL.Query()
+			if got := query.Get("result"); got != "read_run" {
+				t.Fatalf("count result = %q, want read_run", got)
+			}
+			if got := query.Get("query"); got != "study_accession=PRJEB1787" {
+				t.Fatalf("count query = %q", got)
+			}
+			if got := query.Get("format"); got != "json" {
+				t.Fatalf("count format = %q, want json", got)
+			}
+			_, _ = w.Write([]byte(`{"count":"249"}`))
+		default:
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	resultType, count, err := client.CountENA(context.Background(), "ERP001736", AccessionTypeStudy, AccessionTypeRun)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sawStudyLookup || !sawCount {
+		t.Fatalf("sawStudyLookup=%v sawCount=%v", sawStudyLookup, sawCount)
+	}
+	if resultType != AccessionTypeRun {
+		t.Fatalf("resultType = %q, want %q", resultType, AccessionTypeRun)
+	}
+	if count != 249 {
+		t.Fatalf("count = %d, want 249", count)
+	}
+}
+
 func TestResolveSearchLevelRejectsUnsupportedCombination(t *testing.T) {
 	_, err := ResolveSearchLevel(AccessionTypeRun, AccessionTypeSample)
 	if err == nil {

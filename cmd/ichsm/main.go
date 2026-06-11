@@ -24,6 +24,8 @@ const (
 	outputFormatTSV   = "tsv"
 )
 
+const largeJSONRecordWarningThreshold = 1000
+
 func main() {
 	log.SetPrefix("[ichsm] ")
 	log.SetFlags(0)
@@ -66,6 +68,7 @@ type searchOptions struct {
 	apiKey    string
 	email     string
 	outfmt    string
+	count     bool
 	debug     bool
 }
 
@@ -95,6 +98,7 @@ func newSearchCommand() *cobra.Command {
 	flags.StringVar(&opts.apiKey, "api-key", "", "NCBI API key; defaults to NCBI_API_KEY")
 	flags.StringVar(&opts.email, "email", "", "Email sent to NCBI; defaults to NCBI_EMAIL")
 	flags.StringVar(&opts.outfmt, "outfmt", opts.outfmt, "Output format: json, table, or tsv")
+	flags.BoolVar(&opts.count, "count", false, "Only count matching ENA records; do not fetch metadata")
 	_ = flags.MarkHidden("acc_file")
 
 	return cmd
@@ -134,7 +138,15 @@ func executeSearch(cmd *cobra.Command, opts searchOptions) error {
 	client.NCBIAPIKey = opts.apiKey
 	client.NCBIEmail = opts.email
 
-	results, err := searchAccessions(cmd.Context(), client, accessions, fields, level, source, opts.debug, cmd.ErrOrStderr())
+	if opts.count {
+		counts, err := countAccessions(cmd.Context(), client, accessions, level, source, cmd.ErrOrStderr())
+		if err != nil {
+			return err
+		}
+		return writeCountResults(cmd.OutOrStdout(), counts, outfmt)
+	}
+
+	results, err := searchAccessions(cmd.Context(), client, accessions, fields, level, source, opts.debug, cmd.ErrOrStderr(), outfmt == outputFormatJSON)
 	if err != nil {
 		return err
 	}
@@ -323,15 +335,24 @@ func accessionsFromInputs(accession string, accFile string) ([]string, error) {
 	return ichsm.ReadAccessionsFile(accFile)
 }
 
-func searchAccessions(ctx context.Context, client *ichsm.Client, accessions []string, fields []string, level ichsm.AccessionType, source ichsm.SearchSource, debug bool, errOut io.Writer) ([]ichsm.SearchResult, error) {
+type accessionSearch struct {
+	input string
+	fixed string
+	typ   ichsm.AccessionType
+}
+
+type countResult struct {
+	InputAccession string              `json:"input_accession"`
+	ResultType     ichsm.AccessionType `json:"result_type"`
+	Count          int                 `json:"count"`
+}
+
+func prepareAccessionSearches(accessions []string, level ichsm.AccessionType, errOut io.Writer) ([]accessionSearch, error) {
 	if len(accessions) == 0 {
 		return nil, errors.New("no accessions provided")
 	}
-
-	type accessionSearch struct {
-		input string
-		fixed string
-		typ   ichsm.AccessionType
+	if errOut == nil {
+		errOut = io.Discard
 	}
 
 	toSearch := make([]accessionSearch, 0, len(accessions))
@@ -356,6 +377,19 @@ func searchAccessions(ctx context.Context, client *ichsm.Client, accessions []st
 		}
 
 		toSearch = append(toSearch, accessionSearch{input: accession, fixed: fixedAccession, typ: accessionType})
+	}
+
+	return toSearch, nil
+}
+
+func searchAccessions(ctx context.Context, client *ichsm.Client, accessions []string, fields []string, level ichsm.AccessionType, source ichsm.SearchSource, debug bool, errOut io.Writer, preflightLargeJSON bool) ([]ichsm.SearchResult, error) {
+	toSearch, err := prepareAccessionSearches(accessions, level, errOut)
+	if err != nil {
+		return nil, err
+	}
+
+	if preflightLargeJSON {
+		warnLargeJSONSearchCounts(ctx, client, toSearch, level, source, debug, errOut)
 	}
 
 	results := make([]ichsm.SearchResult, 0, len(toSearch))
@@ -388,6 +422,102 @@ func searchAccessions(ctx context.Context, client *ichsm.Client, accessions []st
 	}
 
 	return results, nil
+}
+
+func countAccessions(ctx context.Context, client *ichsm.Client, accessions []string, level ichsm.AccessionType, source ichsm.SearchSource, errOut io.Writer) ([]countResult, error) {
+	if source == ichsm.SearchSourceNCBI {
+		return nil, fmt.Errorf("--count is currently supported only for ENA-backed searches")
+	}
+
+	toSearch, err := prepareAccessionSearches(accessions, level, errOut)
+	if err != nil {
+		return nil, err
+	}
+
+	counts := make([]countResult, 0, len(toSearch))
+	for _, accession := range toSearch {
+		resultType, count, err := client.CountENA(ctx, accession.fixed, accession.typ, level)
+		if err != nil {
+			return nil, fmt.Errorf("error counting accession %s: %w", accession.input, err)
+		}
+		counts = append(counts, countResult{
+			InputAccession: accession.input,
+			ResultType:     resultType,
+			Count:          count,
+		})
+	}
+	return counts, nil
+}
+
+func warnLargeJSONSearchCounts(ctx context.Context, client *ichsm.Client, searches []accessionSearch, level ichsm.AccessionType, source ichsm.SearchSource, debug bool, errOut io.Writer) {
+	if errOut == nil {
+		errOut = io.Discard
+	}
+
+	for _, accession := range searches {
+		resultType, err := ichsm.ResolveSearchLevel(accession.typ, level)
+		if err != nil {
+			continue
+		}
+		if !needsJSONCountPreflight(source, accession.typ, resultType) {
+			continue
+		}
+
+		countResultType, count, err := client.CountENA(ctx, accession.fixed, accession.typ, level)
+		if err != nil {
+			if debug {
+				log.Printf("warning: could not check result count for accession %s: %v", accession.input, err)
+			}
+			continue
+		}
+		if count >= largeJSONRecordWarningThreshold {
+			fmt.Fprintf(errOut, "warning: JSON search for %s at %s level will return %d records; JSON output may use a lot of memory. Use --outfmt tsv for large tabular output.\n", accession.input, countResultType, count)
+		}
+	}
+}
+
+func needsJSONCountPreflight(source ichsm.SearchSource, inputType ichsm.AccessionType, resultType ichsm.AccessionType) bool {
+	if source == ichsm.SearchSourceNCBI {
+		return false
+	}
+
+	switch inputType {
+	case ichsm.AccessionTypeStudy:
+		return resultType != ichsm.AccessionTypeStudy
+	case ichsm.AccessionTypeContigSet, ichsm.AccessionTypeWGSSet, ichsm.AccessionTypeTSASet, ichsm.AccessionTypeTLSSet:
+		return true
+	default:
+		return false
+	}
+}
+
+func writeCountResults(out io.Writer, counts []countResult, outfmt string) error {
+	if outfmt == outputFormatJSON {
+		encoded, err := json.MarshalIndent(counts, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, string(encoded))
+		return nil
+	}
+
+	rows := countRows(counts)
+	if outfmt == outputFormatTable {
+		return writeAlignedRows(out, rows)
+	}
+	return writeDelimitedRows(out, rows, "\t")
+}
+
+func countRows(counts []countResult) [][]string {
+	rows := [][]string{{"input_accession", "result_type", "count"}}
+	for _, count := range counts {
+		rows = append(rows, []string{
+			count.InputAccession,
+			string(count.ResultType),
+			fmt.Sprint(count.Count),
+		})
+	}
+	return rows
 }
 
 func writeJSON(out io.Writer, results []ichsm.SearchResult) error {

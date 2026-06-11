@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -111,6 +112,115 @@ func TestRunSearchFailsWhenNoRecordsReturned(t *testing.T) {
 	}
 }
 
+func TestWarnLargeJSONSearchCountsForProjectRun(t *testing.T) {
+	var sawCount bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write([]byte(`[{"study_accession":"PRJEB1787"}]`))
+		case "/count":
+			sawCount = true
+			query := r.URL.Query()
+			if got := query.Get("result"); got != "read_run" {
+				t.Fatalf("count result = %q, want read_run", got)
+			}
+			if got := query.Get("query"); got != "study_accession=PRJEB1787" {
+				t.Fatalf("count query = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"count":"1000"}`))
+		default:
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := &ichsm.Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	var stderr bytes.Buffer
+	warnLargeJSONSearchCounts(context.Background(), client, []accessionSearch{
+		{input: "ERP001736", fixed: "ERP001736", typ: ichsm.AccessionTypeStudy},
+	}, ichsm.AccessionTypeRun, ichsm.SearchSourceAuto, false, &stderr)
+
+	if !sawCount {
+		t.Fatal("expected count preflight request")
+	}
+	if got := stderr.String(); !strings.Contains(got, "JSON search for ERP001736 at run level will return 1000 records") {
+		t.Fatalf("stderr = %q, want large JSON warning", got)
+	}
+}
+
+func TestWarnLargeJSONSearchCountsSkipsSampleRun(t *testing.T) {
+	var requested bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = true
+		http.Error(w, "unexpected request", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := &ichsm.Client{BaseURL: server.URL + "/", HTTPClient: server.Client()}
+	var stderr bytes.Buffer
+	warnLargeJSONSearchCounts(context.Background(), client, []accessionSearch{
+		{input: "SAMN05276490", fixed: "SAMN05276490", typ: ichsm.AccessionTypeSample},
+	}, ichsm.AccessionTypeRun, ichsm.SearchSourceAuto, false, &stderr)
+
+	if requested {
+		t.Fatal("did not expect count preflight request")
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %q, want no warning", stderr.String())
+	}
+}
+
+func TestNeedsJSONCountPreflight(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     ichsm.SearchSource
+		inputType  ichsm.AccessionType
+		resultType ichsm.AccessionType
+		want       bool
+	}{
+		{
+			name:       "study fanout",
+			source:     ichsm.SearchSourceAuto,
+			inputType:  ichsm.AccessionTypeStudy,
+			resultType: ichsm.AccessionTypeRun,
+			want:       true,
+		},
+		{
+			name:       "study self lookup",
+			source:     ichsm.SearchSourceAuto,
+			inputType:  ichsm.AccessionTypeStudy,
+			resultType: ichsm.AccessionTypeStudy,
+		},
+		{
+			name:       "sample to run intentionally skipped",
+			source:     ichsm.SearchSourceAuto,
+			inputType:  ichsm.AccessionTypeSample,
+			resultType: ichsm.AccessionTypeRun,
+		},
+		{
+			name:       "contig set",
+			source:     ichsm.SearchSourceENA,
+			inputType:  ichsm.AccessionTypeContigSet,
+			resultType: ichsm.AccessionTypeContigSet,
+			want:       true,
+		},
+		{
+			name:       "forced ncbi",
+			source:     ichsm.SearchSourceNCBI,
+			inputType:  ichsm.AccessionTypeContigSet,
+			resultType: ichsm.AccessionTypeContigSet,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := needsJSONCountPreflight(tt.source, tt.inputType, tt.resultType); got != tt.want {
+				t.Fatalf("needsJSONCountPreflight() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRunSearchWritesTable(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search" {
@@ -209,6 +319,99 @@ func TestRunSearchWritesJSON(t *testing.T) {
 	}
 	if got["ERR123456"][0]["fastq_ftp"] != "ftp.sra.ebi.ac.uk/file.fastq.gz" {
 		t.Fatalf("fastq_ftp = %q", got["ERR123456"][0]["fastq_ftp"])
+	}
+}
+
+func TestRunSearchCountWritesTSV(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			query := r.URL.Query()
+			if got := query.Get("result"); got != "study" {
+				t.Fatalf("study result = %q, want study", got)
+			}
+			if got := query.Get("query"); got != "study_accession=PRJEB1787 OR secondary_study_accession=PRJEB1787" {
+				t.Fatalf("study query = %q", got)
+			}
+			if got := query.Get("fields"); got != "study_accession" {
+				t.Fatalf("study fields = %q", got)
+			}
+			_, _ = w.Write([]byte(`[{"study_accession":"PRJEB1787"}]`))
+		case "/count":
+			query := r.URL.Query()
+			if got := query.Get("result"); got != "read_run" {
+				t.Fatalf("count result = %q, want read_run", got)
+			}
+			if got := query.Get("query"); got != "study_accession=PRJEB1787" {
+				t.Fatalf("count query = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"count":"249"}`))
+		default:
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "PRJEB1787", "--level", "run", "--count"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	const want = "input_accession\tresult_type\tcount\n" +
+		"PRJEB1787\trun\t249\n"
+	if stdout != want {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestRunSearchCountWritesJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/count" {
+			t.Fatalf("path = %q, want /count", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("result"); got != "read_run" {
+			t.Fatalf("count result = %q, want read_run", got)
+		}
+		if got := query.Get("query"); got != "run_accession=ERR123456" {
+			t.Fatalf("count query = %q", got)
+		}
+		_, _ = w.Write([]byte(`{"count":"1"}`))
+	}))
+	defer server.Close()
+
+	withTestClient(t, server)
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "ERR123456", "--count", "--outfmt", "json"})
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	var got []countResult
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("json output did not unmarshal: %v\n%s", err, stdout)
+	}
+	if len(got) != 1 || got[0].InputAccession != "ERR123456" || got[0].ResultType != ichsm.AccessionTypeRun || got[0].Count != 1 {
+		t.Fatalf("count json = %#v", got)
+	}
+}
+
+func TestRunSearchCountRejectsNCBISource(t *testing.T) {
+	code, stdout := captureStdout(t, func() int {
+		return run([]string{"search", "-a", "GCF_000001405.40", "--source", "ncbi", "--count"})
+	})
+
+	if code == 0 {
+		t.Fatal("expected non-zero exit code")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
 	}
 }
 

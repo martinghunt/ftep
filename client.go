@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -284,6 +285,78 @@ func (c *Client) queryENAContigSet(ctx context.Context, accession string, access
 	return lastResultType, lastFields, nil, nil
 }
 
+// CountENA returns the number of ENA records matching one normalized accession
+// at a requested output level.
+func (c *Client) CountENA(ctx context.Context, accession string, accessionType AccessionType, level AccessionType) (AccessionType, int, error) {
+	return c.countENA(ctx, accession, accessionType, level)
+}
+
+func (c *Client) countENA(ctx context.Context, accession string, accessionType AccessionType, level AccessionType) (AccessionType, int, error) {
+	resultType, err := ResolveSearchLevel(accessionType, level)
+	if err != nil {
+		return "", 0, err
+	}
+	if resultType == AccessionTypeContigSet {
+		return c.countENAContigSet(ctx, accession, accessionType)
+	}
+
+	if accessionType == AccessionTypeStudy && resultType != AccessionTypeStudy {
+		accession, err = c.resolvePrimaryStudyAccession(ctx, accession)
+		if err != nil {
+			return "", 0, err
+		}
+	}
+
+	count, err := c.countENAResultType(ctx, accession, accessionType, resultType)
+	if err != nil {
+		return "", 0, err
+	}
+	return resultType, count, nil
+}
+
+func (c *Client) countENAContigSet(ctx context.Context, accession string, accessionType AccessionType) (AccessionType, int, error) {
+	candidates := []AccessionType{AccessionTypeWGSSet, AccessionTypeTSASet, AccessionTypeTLSSet}
+	var lastResultType AccessionType
+	var lastErr error
+	for _, resultType := range candidates {
+		count, err := c.countENAResultType(ctx, accession, accessionType, resultType)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		lastResultType = resultType
+		if count > 0 {
+			return resultType, count, nil
+		}
+	}
+
+	if lastErr != nil {
+		return "", 0, lastErr
+	}
+	if lastResultType == "" {
+		lastResultType = AccessionTypeContigSet
+	}
+	return lastResultType, 0, nil
+}
+
+func (c *Client) countENAResultType(ctx context.Context, accession string, accessionType AccessionType, resultType AccessionType) (int, error) {
+	searchKey, searchValue, err := SearchKeyValue(accessionType, resultType, accession)
+	if err != nil {
+		return 0, err
+	}
+
+	endpoint, ok := urlSearchData[resultType]
+	if !ok {
+		return 0, fmt.Errorf("unsupported accession type %q", resultType)
+	}
+
+	params := url.Values{}
+	params.Set("result", endpoint.result)
+	params.Set(searchKey, searchValue)
+	params.Set("format", "json")
+	return c.requestCount(ctx, params)
+}
+
 // Search identifies and queries a set of accessions. As in the original CLI,
 // all accessions must have the same inferred type.
 func (c *Client) Search(ctx context.Context, opts SearchOptions) ([]SearchResult, error) {
@@ -502,6 +575,25 @@ func (c *Client) requestText(ctx context.Context, path string, params url.Values
 		return "", err
 	}
 	return string(body), nil
+}
+
+func (c *Client) requestCount(ctx context.Context, params url.Values) (int, error) {
+	body, err := c.request(ctx, "count", params)
+	if err != nil {
+		return 0, err
+	}
+
+	var response struct {
+		Count string `json:"count"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return 0, fmt.Errorf("error parsing ENA count json: %w", err)
+	}
+	count, err := strconv.Atoi(response.Count)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing ENA count value %q: %w", response.Count, err)
+	}
+	return count, nil
 }
 
 func (c *Client) request(ctx context.Context, path string, params url.Values) ([]byte, error) {
